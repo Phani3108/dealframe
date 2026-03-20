@@ -72,3 +72,75 @@ class Extraction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     segment: Mapped["Segment"] = relationship("Segment", back_populates="extractions")
+
+
+# ── Phase 2: Observatory ───────────────────────────────────────────────────────
+
+class ObservatorySession(Base):
+    __tablename__ = "observatory_sessions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)  # UUID
+    status: Mapped[str] = mapped_column(String(50), default="pending")
+    model_names: Mapped[list] = mapped_column(JSON, default=list)
+    segments_analyzed: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    overall_agreement: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    runs: Mapped[list["ModelRunRecord"]] = relationship(
+        "ModelRunRecord", back_populates="session", cascade="all, delete-orphan"
+    )
+
+
+class ModelRunRecord(Base):
+    __tablename__ = "model_run_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(ForeignKey("observatory_sessions.id"), index=True)
+    segment_timestamp_ms: Mapped[int] = mapped_column(Integer, index=True)
+    model_name: Mapped[str] = mapped_column(String(100), index=True)
+    topic: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    sentiment: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    risk: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    risk_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    objections: Mapped[list] = mapped_column(JSON, default=list)
+    decision_signals: Mapped[list] = mapped_column(JSON, default=list)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    session: Mapped["ObservatorySession"] = relationship(
+        "ObservatorySession", back_populates="runs"
+    )
+
+
+# ── Phase 3: Portfolios ────────────────────────────────────────────────────────
+
+class Portfolio(Base):
+    __tablename__ = "portfolios"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(255), unique=True)
+    description: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    portfolio_videos: Mapped[list["PortfolioVideo"]] = relationship(
+        "PortfolioVideo", back_populates="portfolio", cascade="all, delete-orphan"
+    )
+
+
+class PortfolioVideo(Base):
+    __tablename__ = "portfolio_videos"
+
+    portfolio_id: Mapped[int] = mapped_column(
+        ForeignKey("portfolios.id"), primary_key=True
+    )
+    video_id: Mapped[int] = mapped_column(
+        ForeignKey("videos.id"), primary_key=True
+    )
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    portfolio: Mapped["Portfolio"] = relationship(
+        "Portfolio", back_populates="portfolio_videos"
+    )
+    video: Mapped["Video"] = relationship("Video")

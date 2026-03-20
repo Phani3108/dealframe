@@ -19,6 +19,50 @@
 
 ## Active Tasks
 
+### TASK-007: Phase 2 (Observatory) + Phase 3 (Multi-video Intelligence) Implementation
+- **Status**: 🟢 Completed
+- **Date**: 2026-03-21
+- **Prompt/Trigger**: User: "Go for the next phases"
+- **Work Done**:
+  - **Phase 2 — Comparative Model Observatory**:
+    - `temporalos/extraction/models/claude.py` — Claude Sonnet extraction adapter (Anthropic SDK, markdown-fence stripping, OTEL span, retry with tenacity)
+    - `temporalos/vision/models/gpt4o_vision.py` — GPT-4o Vision frame-analysis adapter → FrameAnalysis
+    - `temporalos/vision/models/claude_vision.py` — Claude Vision frame-analysis adapter
+    - `temporalos/vision/models/qwen_vl.py` — Local Qwen2.5-VL-7B-Instruct adapter (lazy import, 4-bit quant, MPS/CUDA/CPU auto-detect, model-cache singleton)
+    - `temporalos/observatory/runner.py` — Full `ObservatoryRunner` (ThreadPoolExecutor parallel execution, `register_extractor()`, `run()`, `compare()`)
+    - `temporalos/observatory/comparator.py` — `Comparator` with pairwise topic/sentiment/risk agreement matrices, per-model stats, `ComparisonReport.to_dict()`
+    - `temporalos/api/routes/observatory.py` — `POST /observatory/compare` (202 + poll), `GET /observatory/sessions/{id}`, `GET /observatory/sessions`
+    - `temporalos/db/models.py` — Added `ObservatorySession` + `ModelRunRecord` ORM tables
+  - **Phase 3 — Multi-video Intelligence**:
+    - `temporalos/intelligence/aggregator.py` — `VideoAggregator` (async DB-backed), `_aggregate_objections()` + `_aggregate_topic_trends()` pure-Python helpers
+    - `temporalos/api/routes/intelligence.py` — `GET /intelligence/objections`, `/topics/trend`, `/risk/summary`, `POST /intelligence/portfolios`, `POST /intelligence/portfolios/{id}/videos`
+    - `temporalos/db/models.py` — Added `Portfolio` + `PortfolioVideo` ORM tables
+    - `temporalos/api/main.py` — Wired `observatory.router` + `intelligence.router`
+  - **Testing** (all passing — Rule §0 satisfied):
+    - `tests/unit/test_comparator.py` — 9 unit tests for Comparator agreement metrics
+    - `tests/unit/test_aggregator.py` — 12 unit tests for aggregation helpers
+    - `tests/e2e/test_phase2_observatory.py` — 13 e2e tests: ObservatoryRunner, Comparator, Observatory API lifecycle
+    - `tests/e2e/test_phase3_intelligence.py` — 20 e2e tests: aggregation logic + Intelligence API with dependency injection mocking
+  - **Final result**: `python -m pytest tests/` → **89 passed, 0 failures** ✅
+- **Files Changed**:
+  - `temporalos/extraction/models/claude.py` — Created
+  - `temporalos/vision/models/__init__.py` — Created
+  - `temporalos/vision/models/gpt4o_vision.py` — Created
+  - `temporalos/vision/models/claude_vision.py` — Created
+  - `temporalos/vision/models/qwen_vl.py` — Created
+  - `temporalos/observatory/runner.py` — Implemented (was stub)
+  - `temporalos/observatory/comparator.py` — Created
+  - `temporalos/api/routes/observatory.py` — Created
+  - `temporalos/api/routes/intelligence.py` — Created
+  - `temporalos/intelligence/aggregator.py` — Implemented (was stub)
+  - `temporalos/db/models.py` — 4 new ORM tables added
+  - `temporalos/api/main.py` — Observatory + Intelligence routers added
+  - `tests/unit/test_comparator.py` — Created
+  - `tests/unit/test_aggregator.py` — Created
+  - `tests/e2e/test_phase2_observatory.py` — Created
+  - `tests/e2e/test_phase3_intelligence.py` — Created
+- **Notes**: Phase 2 and Phase 3 are done. 89 tests total (9 Phase 1 e2e + 13 Phase 2 e2e + 20 Phase 3 e2e + 47 unit tests). Observatory uses ThreadPoolExecutor for parallel model inference. Aggregator helper functions are pure-Python for easy testability. Intelligence API uses FastAPI Depends(get_session) for DB injection.
+
 ### TASK-006: Push to GitHub with README
 - **Status**: 🟢 Completed
 - **Date**: 2026-03-20

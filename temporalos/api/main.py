@@ -9,7 +9,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from ..config import get_settings
 from ..db.session import init_db
 from ..observability.telemetry import setup_telemetry
-from .routes import process
+from .routes import intelligence, observatory, process
 
 
 @asynccontextmanager
@@ -34,6 +34,8 @@ app = FastAPI(
 FastAPIInstrumentor.instrument_app(app)
 
 app.include_router(process.router, prefix="/api/v1")
+app.include_router(observatory.router, prefix="/api/v1")
+app.include_router(intelligence.router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["meta"])
