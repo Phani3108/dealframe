@@ -8,7 +8,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg)](https://fastapi.tiangolo.com)
-[![Tests](https://img.shields.io/badge/tests-177%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-208%20passing-brightgreen.svg)](#testing)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 </div>
@@ -110,6 +110,7 @@ This project is intentionally scoped around three deep skill areas:
 | **3** | Multi-video Intelligence (portfolio analytics) | ✅ Done |
 | **4** | Fine-tuning Arc (LoRA dataset → training → eval → registry) | ✅ Done |
 | **5** | Local SLM Pipeline (zero API calls + rule-based fallback) | ✅ Done |
+| **6** | Frontend Dashboard (React + Vite + Tailwind SPA) | ✅ Done |
 
 ---
 
@@ -175,13 +176,13 @@ make test
 
 # End-to-end tests (tests the full pipeline)
 make test-e2e
-# → 130 passed
+# → 161+ passed
 
 # All tests
 make test-all
 ```
 
-**Current test status**: `177 passed, 0 failed`
+**Current test status**: `208 passed, 0 failed`
 
 ---
 
@@ -215,8 +216,16 @@ TemporalOS/
 │   └── settings.yaml   # Default configuration
 ├── claude.md           # Project rules & conventions (read this first)
 ├── planning.md         # Architecture, decisions, phased roadmap
+├── frontend/
+│   ├── src/
+│   │   ├── api/        # Typed API client (all 5 route groups)
+│   │   ├── components/ # Layout, StatCard, Badge, SegmentCard
+│   │   └── pages/      # Dashboard, Upload, Results, Observatory, Intelligence, Finetuning, LocalPipeline
+│   ├── dist/           # Built SPA (served by FastAPI at /)
+│   ├── package.json    # React 18 + Vite 5 + Tailwind 3 + recharts + lucide-react
+│   └── vite.config.ts  # Proxy /api → localhost:8000 in dev
 ├── tasks.md            # Complete task audit log
-├── Makefile            # dev / test / test-e2e / process / db-up
+├── Makefile            # dev / test / test-e2e / process / db-up / frontend-*
 ├── docker-compose.yml  # PostgreSQL service
 └── pyproject.toml      # Dependencies (core, audio, vision, finetuning, dev)
 ```
@@ -307,7 +316,20 @@ All routes are prefixed with `/api/v1`. Full OpenAPI docs at `http://localhost:8
 | `GET` | `/local/process/{job_id}` | Poll local processing job |
 | `GET` | `/local/jobs` | List all local processing jobs |
 | `POST` | `/local/benchmark` | Run local vs API latency comparison |
+### Frontend (Phase 6)
 
+The compiled React SPA is served directly by FastAPI:
+
+| Path | Description |
+|------|-------------|
+| `/` | Dashboard — stat cards, recent jobs, top objections |
+| `/upload` | Upload & Process — drag-drop, stage tracker, mode selector |
+| `/results/:jobId` | Analysis results — segment cards with risk-colored borders |
+| `/observatory` | Multi-model comparison sessions |
+| `/intelligence` | Cross-video analytics with Recharts charts |
+| `/finetuning` | LoRA training lifecycle — runs table, activate model |
+| `/local` | Local pipeline — model status, process locally |
+| `/assets/*` | Static CSS/JS bundles (Vite build output) |
 ---
 
 ## Fine-tuning Workflow
@@ -354,6 +376,48 @@ curl -X POST http://localhost:8000/api/v1/local/benchmark \
 The local pipeline falls back gracefully:
 - **Fine-tuned adapter present** → uses `FineTunedExtractionModel` (LoRA adapter via PEFT)
 - **No adapter** → uses `_RuleBasedExtractor` (keyword matching, zero dependencies, confidence=0.4)
+
+---
+
+## Frontend Dashboard (Phase 6)
+
+The dashboard is a React 18 + Vite SPA with Tailwind CSS (white background, indigo primary, risk colour-coding).
+
+### Development
+
+```bash
+# 1. Install frontend deps (one-time)
+make frontend-install        # or: cd frontend && npm install
+
+# 2. Build for production (served by FastAPI at localhost:8000)
+make frontend-build          # → frontend/dist/
+
+# 3. Start the API
+make dev                     # FastAPI at http://localhost:8000
+# Visit http://localhost:8000 to see the dashboard
+```
+
+### Hot-reload dev mode (optional)
+
+```bash
+# Terminal 1 — API backend
+make dev                     # http://localhost:8000
+
+# Terminal 2 — Vite dev server with hot-reload
+make frontend-dev            # http://localhost:3000  (proxies /api → localhost:8000)
+```
+
+### Pages
+
+| Route | Page |
+|-------|------|
+| `/` | **Dashboard** — stat cards, recent jobs table, top objections mini-chart |
+| `/upload` | **Upload** — drag-drop zone, API/Local mode selector, live stage progress |
+| `/results/:id` | **Results** — risk score, expandable segment cards (risk-coloured borders) |
+| `/observatory` | **Observatory** — multi-model comparison, agreement scores |
+| `/intelligence` | **Intelligence** — bar/pie/line charts via Recharts |
+| `/finetuning` | **Fine-tuning** — training runs table, activate model button |
+| `/local` | **Local Pipeline** — model status checks, process locally, job history |
 
 ---
 

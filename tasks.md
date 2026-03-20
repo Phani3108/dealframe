@@ -19,6 +19,49 @@
 
 ## Active Tasks
 
+### TASK-009: Phase 6 — Frontend Dashboard
+- **Status**: 🟢 Completed
+- **Date**: 2026-06-10
+- **Prompt/Trigger**: User: "lets continue with the next phase. Let's test thoroughly after that's done. Let's ensure the frontend is properly done with a white background, new good elements and then we can push to the github repo."
+- **Work Done**:
+  - Built a full React 18 + TypeScript + Vite 5 + Tailwind CSS 3 SPA with white-background design
+  - **7 pages**: Dashboard (stat cards + recent jobs + top objections), Upload (drag-drop + live stage tracker), Results (segment cards with risk-colored borders), Observatory (multi-model comparison sessions), Intelligence (Recharts bar/pie/line charts), Finetuning (training runs lifecycle), LocalPipeline (model status + process locally)
+  - **Shared components**: `Layout` (fixed sidebar), `StatCard`, `Badge` (risk/status), `SegmentCard` (expandable with objections/signals)
+  - **Typed API client** (`src/api/client.ts`): covers all 5 backend route groups (process, observatory, intelligence, finetuning, local) with full TypeScript interfaces
+  - Updated `temporalos/api/main.py`: mounts `/assets` from `frontend/dist/assets/` via `StaticFiles`; SPA catch-all `GET /{full_path:path}` serves `index.html` without shadowing API routes
+  - Updated `Makefile` with `frontend-install`, `frontend-dev`, `frontend-build`, `frontend-clean` targets
+  - **npm build**: `vite build` → `dist/index.html` (0.69KB) + `dist/assets/*.css` (23.80KB) + `dist/assets/*.js` (626.99KB) ✅
+  - **31 e2e tests** in `tests/e2e/test_phase6_frontend.py`: dist structure (8), SPA serving (12), API not shadowed (8), content integrity (3)
+  - **Final result**: `python -m pytest tests/ -v` → **208 passed, 0 failures** ✅
+- **Files Changed**:
+  - `frontend/package.json` — Created (React 18, Vite 5, Tailwind 3, recharts, lucide-react)
+  - `frontend/vite.config.ts` — Created
+  - `frontend/tsconfig.json` — Created
+  - `frontend/tsconfig.node.json` — Created
+  - `frontend/tailwind.config.js` — Created
+  - `frontend/postcss.config.cjs` — Created
+  - `frontend/index.html` — Created
+  - `frontend/src/index.css` — Created (Tailwind directives + component classes)
+  - `frontend/src/main.tsx` — Created
+  - `frontend/src/App.tsx` — Created (BrowserRouter + 7 routes)
+  - `frontend/src/api/client.ts` — Created (full typed API client)
+  - `frontend/src/components/Layout.tsx` — Created (sidebar + main area)
+  - `frontend/src/components/StatCard.tsx` — Created
+  - `frontend/src/components/Badge.tsx` — Created (RiskBadge + StatusBadge)
+  - `frontend/src/components/SegmentCard.tsx` — Created (expandable)
+  - `frontend/src/pages/Dashboard.tsx` — Created
+  - `frontend/src/pages/Upload.tsx` — Created
+  - `frontend/src/pages/Results.tsx` — Created
+  - `frontend/src/pages/Observatory.tsx` — Created
+  - `frontend/src/pages/Intelligence.tsx` — Created (Recharts visualizations)
+  - `frontend/src/pages/Finetuning.tsx` — Created
+  - `frontend/src/pages/LocalPipeline.tsx` — Created
+  - `frontend/dist/` — Build output (committed)
+  - `temporalos/api/main.py` — Modified (StaticFiles mount + SPA catch-all)
+  - `Makefile` — Modified (frontend targets)
+  - `tests/e2e/test_phase6_frontend.py` — Created (31 tests)
+- **Notes**: Frontend served from FastAPI at `localhost:8000/`. Dev mode uses Vite dev server at `localhost:3000` with proxy to `localhost:8000`. Run both: `make dev` (API) + `make frontend-dev` (hot reload). All API routes preserved — SPA catch-all only matches non-API paths.
+
 ### TASK-008: Phase 5 — Local SLM Pipeline
 - **Status**: 🟢 Completed
 - **Date**: 2026-06-10

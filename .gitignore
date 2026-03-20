@@ -12,6 +12,9 @@ build/
 venv/
 env/
 
+# Frontend
+frontend/node_modules/
+
 # Environment
 .env
 *.env

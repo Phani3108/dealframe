@@ -1,10 +1,17 @@
 .PHONY: dev install install-audio install-vision db-up db-down \
-        format lint test process
+        format lint test test-e2e test-all process \
+        frontend-install frontend-dev frontend-build frontend-clean
 
 # ── Development ───────────────────────────────────────────────────
 
 dev:
 	uvicorn temporalos.api.main:app --reload --port 8000
+
+# Run backend + frontend dev server simultaneously (requires tmux or two terminals)
+dev-full:
+	@echo "Start backend: make dev"
+	@echo "Start frontend: make frontend-dev"
+	@echo "Or run both with: make dev & make frontend-dev"
 
 install:
 	pip install -e ".[dev]"
@@ -51,6 +58,20 @@ test-e2e:
 
 test-all:
 	pytest tests/ -v -s --cov=temporalos --cov-report=term-missing
+
+# ── Frontend ──────────────────────────────────────────────────────
+
+frontend-install:
+	cd frontend && npm install
+
+frontend-dev:
+	cd frontend && npm run dev
+
+frontend-build:
+	cd frontend && npm run build
+
+frontend-clean:
+	rm -rf frontend/dist frontend/node_modules
 
 # ── Pipeline ──────────────────────────────────────────────────────
 # Usage: make process VIDEO=path/to/call.mp4
