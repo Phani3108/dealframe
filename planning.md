@@ -1,6 +1,8 @@
 # TemporalOS — Planning & Architecture
 
-> Last updated: 2026-03-20
+> Last updated: 2026-03-21
+
+> **See [EXPANSION.md](./EXPANSION.md) for the full expansion vision — industries, integrations, user tiers, and the 5-phase build plan.**
 
 ---
 
@@ -201,73 +203,138 @@ This is the core differentiator. At any timestamp `t`, you need:
 
 ## 4. Phased Roadmap
 
-### Phase 1: Foundation (Weeks 1-2)
-- [ ] Project scaffolding (Python package structure, configs, CI)
-- [ ] FFmpeg video → frame extraction pipeline
-- [ ] Whisper batch transcription pipeline
-- [ ] Basic timestamp alignment (nearest-neighbor)
-- [ ] Prompt-based extraction (GPT-4o/Claude) — no fine-tuning yet
-- [ ] Basic FastAPI endpoint: upload video → get JSON
-- [ ] OpenTelemetry instrumentation from day one
+### ✅ Phase 1: Foundation — DONE
+- [x] Project scaffolding, config, CI
+- [x] FFmpeg frame extraction, scene detection, keyframe deduplication
+- [x] Whisper batch ASR, streaming ASR (WebSocket)
+- [x] Temporal alignment
+- [x] GPT-4o + Claude extraction models
+- [x] FastAPI: upload → job poll → results
+- [x] OpenTelemetry + Prometheus metrics
 
-### Phase 2: Vision & Multimodal (Weeks 3-4)
-- [ ] Vision model integration (GPT-4o vision / Claude Vision)
-- [ ] Slide detection + OCR pipeline
-- [ ] UI screen recognition
-- [ ] Vision model benchmarking (compare 3-4 models)
-- [ ] Enhanced temporal alignment with visual anchors
-- [ ] Dashboard for visualizing aligned timeline
+### ✅ Phase 2: Observatory & Multi-Video Intelligence — DONE
+- [x] Comparative model observatory (GPT-4o vs Claude vs Qwen-VL)
+- [x] Pairwise agreement scoring
+- [x] Multi-video aggregation (objections, topic trends, risk summary)
+- [x] Portfolio view
 
-### Phase 3: Real-time Streaming (Weeks 5-6)
-- [ ] Deepgram streaming ASR integration
-- [ ] Real-time frame capture from live stream
-- [ ] WebSocket API for streaming results
-- [ ] Partial/incremental structured extraction
-- [ ] Streaming observability (latency percentiles, buffer health)
+### ✅ Phase 3: Vision & OCR — DONE
+- [x] Scene detection, keyframe selection
+- [x] EasyOCR pipeline, slide classifier (SLIDE/FACE/CHART/SCREEN)
+- [x] Vision pipeline (Qwen-VL, GPT-4o Vision, Claude Vision)
 
-### Phase 4: Fine-tuning (Weeks 7-9)
-- [ ] Annotation tool / pipeline for labeling segments
-- [ ] Dataset creation from prompt-based extractions (bootstrap)
-- [ ] LoRA fine-tune Mistral/Llama on extraction task
-- [ ] Evaluation framework: accuracy, latency, cost comparison
-- [ ] Model versioning and A/B testing infrastructure
+### ✅ Phase 4: Fine-tuning Arc — DONE
+- [x] Dataset builder (JSONL export for LoRA)
+- [x] LoRA trainer (PEFT, dry-run mode for CI)
+- [x] Evaluator (field-level accuracy, F1, calibration curve)
+- [x] Model registry (JSON-backed versioning)
+- [x] Fine-tuned extraction model adapter
 
-### Phase 5: Production Observability (Weeks 10-11)
-- [ ] Drift detection pipeline (Evidently AI or custom)
-- [ ] Confidence calibration analysis
-- [ ] Grafana dashboards for all metrics
-- [ ] Alerting on accuracy degradation
-- [ ] Human-in-the-loop review queue
-- [ ] Cost optimization analysis (local vs API models)
+### ✅ Phase 5: Local SLM Pipeline — DONE
+- [x] Rule-based extractor (zero dependencies)
+- [x] LocalPipeline (Whisper + rule-based + optional Qwen-VL)
+- [x] Benchmark runner (local vs API cost/latency)
 
-### Phase 6: Polish & Expand (Week 12+)
-- [ ] Local SLM option (Phi-3 / Qwen2.5 running locally)
-- [ ] Multi-language support
-- [ ] Batch processing (process video library)
-- [ ] Export to CRM integrations
-- [ ] Documentation and demo videos
+### ✅ Phase 6: Frontend Dashboard — DONE
+- [x] React 18 + Vite + Tailwind SPA
+- [x] 10 pages, full design system
+- [x] Dashboard, Upload, Results, Observatory, Intelligence, Fine-tuning, Local Pipeline, Observability, Search, Streaming
+
+### ✅ Phase 7: Observability & Drift Detection — DONE
+- [x] Drift detector (Welch's t-test, KL divergence)
+- [x] Confidence calibration (ECE, reliability bins)
+- [x] Review queue, human-in-the-loop labeling
+- [x] Prometheus metrics endpoint
+
+### ✅ Phase 8: Streaming Pipeline — DONE
+- [x] MockStreamingASR (byte-rate model)
+- [x] StreamingPipeline (async generator, chunked extraction)
+- [x] WebSocket endpoint (/ws/stream)
+
+### ✅ Phase 9: Scene Intelligence — DONE
+- [x] SceneDetector, KeyframeSelector, VisionPipeline
+- [x] EnrichedFrame with OCR + classification
+
+### ✅ Phase 10: Search & Portfolio Insights — DONE
+- [x] TF-IDF SearchIndex (inverted index, risk/topic filter)
+- [x] Portfolio insights: win/loss patterns, objection velocity, rep comparison
+
+---
+
+### 🔷 Phase A: Platform Primitives (NEXT)
+*See EXPANSION.md §5 Phase A for full spec.*
+- [ ] A1 — Speaker diarization (pyannote-audio)
+- [ ] A2 — Auto-summary engine (executive / action-items / meeting-notes / deal-brief templates)
+- [ ] A3 — Clip extractor API (FFmpeg cut + serve per timestamp range)
+- [ ] A4 — Custom schema builder (YAML → extraction prompt → Pydantic model)
+- [ ] A5 — Webhook delivery system (POST results to any URL on completion)
+- [ ] A6 — Python SDK (`pip install temporalos`)
+- [ ] A7 — REST API v2 (pagination cursors, versioned routes)
+
+### 🔷 Phase B: Integrations
+*See EXPANSION.md §5 Phase B for full spec.*
+- [ ] B1 — Zoom auto-ingest (recording webhook)
+- [ ] B2 — Google Meet auto-ingest (Calendar push + Drive)
+- [ ] B3 — Slack bot (slash command + daily digest)
+- [ ] B4 — Notion exporter (OAuth + DB record per video)
+- [ ] B5 — Salesforce enrichment
+- [ ] B6 — HubSpot enrichment
+- [ ] B7 — Zapier app
+- [ ] B8 — LangChain tool
+- [ ] B9 — LlamaIndex reader
+
+### 🔷 Phase C: Intelligence Layer
+- [ ] C1 — Video Q&A agent (RAG over extraction DB)
+- [ ] C2 — Deal risk agent (Slack alerts on risk changes)
+- [ ] C3 — Coaching engine (rep benchmarks + coaching cards)
+- [ ] C4 — Knowledge graph (entity/relationship extraction)
+- [ ] C5 — Meeting preparation agent (pre-call brief)
+- [ ] C6 — Competitor intelligence mode
+
+### 🔷 Phase D: Vertical Packs
+- [ ] Sales Pack (deepen + talk ratio + deal scoring)
+- [ ] UX Research Pack (pain point coding, usability)
+- [ ] Legal Pack (admissions, contradictions, exhibits)
+- [ ] Education Pack (concept extraction, study notes)
+- [ ] CS & Churn Pack (health signals, expansion indicators)
+- [ ] HR Pack (competency tagging, DEI fairness)
+- [ ] Finance Pack (guidance, disclosures, analyst sentiment)
+
+### 🔷 Phase E: Enterprise Platform
+- [ ] Multi-tenant architecture (row-level isolation)
+- [ ] SSO/SAML (Okta, Azure AD)
+- [ ] HIPAA compliance mode (PII redaction, audit trail)
+- [ ] Celery/Temporal task queue
+- [ ] Self-hosted Helm chart
+- [ ] Custom model per tenant
+- [ ] Batch API with priority queuing
+- [ ] White-label SDK
 
 ---
 
 ## 5. Expansion Ideas (Beyond Core)
 
-### 5.1 Competitive Intelligence Mode
-Instead of sales calls, point it at **product demo videos of competitors**. Extract feature comparisons, positioning, pricing signals.
+> Full expansion vision in **[EXPANSION.md](./EXPANSION.md)**.
 
-### 5.2 Training & Coaching
-Use extraction outputs to build a **sales coaching engine** — identify what top reps do differently (talk/listen ratio, objection handling speed, demo flow).
+### Industries
+Sales, Legal, Healthcare, Education, UX Research, Financial Services, HR, Customer Success, Journalism, Real Estate.
 
-### 5.3 Meeting Intelligence (General)
-Expand beyond sales to any meeting: board meetings, engineering standups, customer support calls. Different extraction schemas per domain.
+### User Tiers
+- **Solo/Freelancer/Student**: pay-per-video, Chrome extension, Obsidian plugin, shareable link
+- **Team/SMB**: shared workspace, Zoom auto-ingest, Slack bot, CRM integrations
+- **Enterprise**: multi-tenant, SSO, HIPAA, self-hosted, custom models, batch API
 
-### 5.4 Video Search Engine
-Build a semantic search layer over extracted data. "Find all moments where a customer mentioned a competitor" → returns timestamped clips.
-
-### 5.5 Multi-Camera / Multi-Stream
-Handle Zoom recordings with gallery view — detect and track multiple participants, extract individual reactions.
-
-### 5.6 Synthetic Data Generation
-Use the extraction pipeline in reverse — generate training data by creating synthetic sales call videos with known ground truth.
+### New Platform Capabilities (see EXPANSION.md §4)
+- Speaker Intelligence (talk ratio, pace, interruptions)
+- Auto-Summary Engine (executive / action-items / meeting-notes)
+- Clip Extractor (timestamp → video clip)
+- Video Q&A Agent (RAG over video library)
+- Deal Risk Agent (Slack alerts)
+- Coaching Engine (rep benchmarks)
+- Custom Schema Builder (YAML → extraction)
+- Knowledge Graph (entity/relationship)
+- Meeting Preparation Agent (pre-call brief)
+- Batch Processing API
 
 ---
 
@@ -292,3 +359,8 @@ Use the extraction pipeline in reverse — generate training data by creating sy
 | 2026-03-20 | OpenTelemetry from day one | Observability is a core learning goal |
 | 2026-03-20 | Prompt-based extraction first, fine-tune later | Need data before fine-tuning |
 | 2026-03-20 | DeepEval for evaluation framework | Already initialized in project |
+| 2026-03-21 | Webhook delivery before all other integrations | Unblocks Zapier, Slack, Notion, CRM without tight coupling |
+| 2026-03-21 | Speaker diarization is Phase A1 priority | Unlocks coaching, talk ratio, HR vertical, rep benchmarks |
+| 2026-03-21 | Custom schema builder unlocks vertical packs | One mechanism replaces 7 vertical-specific extraction models |
+| 2026-03-21 | Python SDK before vertical UI packs | Developer adoption compounds; verticals can be schema files |
+| 2026-03-21 | Chroma for vector store (dev), Pinecone for prod | Zero-dependency local dev path; swap at scale |
