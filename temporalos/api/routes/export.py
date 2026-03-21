@@ -12,11 +12,11 @@ def _get_jobs() -> dict:
     return _jobs
 
 
-@router.get("/{job_id}")
+@router.get("/{job_id}", response_model=None)
 async def export_job(
     job_id: str,
     format: str = Query("json", description="Export format: json, csv, markdown, html"),
-) -> PlainTextResponse | HTMLResponse:
+):
     """Export a job's intelligence in the specified format."""
     from ...export import export
 
