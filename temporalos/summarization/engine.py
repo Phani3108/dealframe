@@ -254,9 +254,112 @@ class MockSummaryEngine:
         return Summary(SummaryType.CUSTOM, content, {}, len(content.split()), "rule-based")
 
 
+# ── LLM-powered summarizer (calls real LLM when API key is available) ────────
+
+class LLMSummaryEngine:
+    """Generates summaries using the configured LLM provider.
+
+    Falls back to MockSummaryEngine if no LLM provider is available.
+    """
+
+    _PROMPTS = {
+        SummaryType.EXECUTIVE: (
+            "Generate a concise executive summary of this sales call. "
+            "Include: key topics discussed, objections raised, decision signals, "
+            "and overall risk assessment. Use bullet points."
+        ),
+        SummaryType.ACTION_ITEMS: (
+            "Extract all action items and next steps from this call. "
+            "Number each item. Be specific about who should do what."
+        ),
+        SummaryType.MEETING_NOTES: (
+            "Generate structured meeting notes with sections: "
+            "Topics Covered, Key Objections, Action Items, Risk Flags."
+        ),
+        SummaryType.DEAL_BRIEF: (
+            "Generate a deal brief: risk level, top objections, buying signals, "
+            "dominant topic, and recommended next steps."
+        ),
+        SummaryType.COACHING_BRIEF: (
+            "Generate a coaching brief for the sales rep: strengths observed, "
+            "areas to improve, and specific talk-time guidance."
+        ),
+        SummaryType.UX_RESEARCH: (
+            "Generate a UX research synthesis: core pain points, feature requests, "
+            "confusion moments, and primary themes."
+        ),
+        SummaryType.CS_QBR: (
+            "Generate a Customer Success QBR report: account health, churn indicators, "
+            "expansion signals, and recommended actions."
+        ),
+        SummaryType.REAL_ESTATE_CONSULT: (
+            "Generate a real estate consultation summary: client priorities, "
+            "budget signals, timeline, and recommended follow-up."
+        ),
+    }
+
+    def __init__(self) -> None:
+        self._fallback = MockSummaryEngine()
+
+    async def generate(
+        self,
+        intel_dict: Dict[str, Any],
+        summary_type: SummaryType,
+        custom_template: str = "",
+    ) -> Summary:
+        # Try LLM first
+        try:
+            from temporalos.llm.router import get_llm, MockLLMProvider
+            llm = get_llm()
+            if isinstance(llm, MockLLMProvider):
+                return self._fallback.generate(intel_dict, summary_type, custom_template)
+        except Exception:
+            return self._fallback.generate(intel_dict, summary_type, custom_template)
+
+        segments = intel_dict.get("segments", [])
+        if not segments:
+            return self._fallback.generate(intel_dict, summary_type, custom_template)
+
+        # Build context from segments
+        context_parts = []
+        for i, seg in enumerate(segments[:30]):  # cap at 30 segments for token limits
+            ext = seg.get("extraction", seg)
+            context_parts.append(
+                f"[Segment {i+1} @ {seg.get('timestamp_str', seg.get('timestamp', '?'))}] "
+                f"Topic: {ext.get('topic', 'general')} | "
+                f"Risk: {ext.get('risk', 'low')} ({ext.get('risk_score', 0):.1%}) | "
+                f"Objections: {', '.join(ext.get('objections', [])) or 'none'} | "
+                f"Signals: {', '.join(ext.get('decision_signals', [])) or 'none'}"
+            )
+        context = "\n".join(context_parts)
+
+        system_prompt = (
+            "You are an expert business analyst generating structured summaries "
+            "from video call intelligence data. Be concise and actionable."
+        )
+        prompt_template = self._PROMPTS.get(summary_type, "")
+        if summary_type == SummaryType.CUSTOM and custom_template:
+            prompt_template = custom_template
+
+        prompt = f"{prompt_template}\n\nCall data ({len(segments)} segments):\n{context}"
+
+        try:
+            resp = await llm.complete(prompt, system=system_prompt, max_tokens=1024)
+            return Summary(
+                type=summary_type,
+                content=resp.text,
+                sections={"raw_response": True, "model": resp.model},
+                word_count=len(resp.text.split()),
+                model=resp.model,
+            )
+        except Exception:
+            return self._fallback.generate(intel_dict, summary_type, custom_template)
+
+
 # ── Singleton ────────────────────────────────────────────────────────────────
 
 _engine: Optional[MockSummaryEngine] = None
+_llm_engine: Optional[LLMSummaryEngine] = None
 
 
 def get_summary_engine() -> MockSummaryEngine:
@@ -264,6 +367,14 @@ def get_summary_engine() -> MockSummaryEngine:
     if _engine is None:
         _engine = MockSummaryEngine()
     return _engine
+
+
+def get_llm_summary_engine() -> LLMSummaryEngine:
+    """Get the LLM-powered summary engine (falls back to rule-based)."""
+    global _llm_engine
+    if _llm_engine is None:
+        _llm_engine = LLMSummaryEngine()
+    return _llm_engine
 
 
 # Type alias for the public interface

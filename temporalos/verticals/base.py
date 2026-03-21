@@ -8,7 +8,8 @@ from temporalos.schemas.registry import FieldDefinition, FieldType, SchemaDefini
 
 
 class VerticalPack(ABC):
-    """A vertical pack bundles a schema, summary type preference, and metadata."""
+    """A vertical pack bundles a schema, summary type preference, extraction
+    logic, and metadata."""
 
     id: str = ""
     name: str = ""
@@ -20,6 +21,15 @@ class VerticalPack(ABC):
     def schema(self) -> SchemaDefinition:
         """Return the SchemaDefinition for this vertical."""
         ...
+
+    def extract(self, segment_data: Dict) -> Dict:
+        """Apply vertical-specific extraction logic to a segment.
+
+        Takes extraction data dict and enriches it with vertical-specific
+        fields. Default implementation uses rule-based keyword matching.
+        Override in subclasses for vertical-specific logic.
+        """
+        return segment_data
 
     def to_dict(self) -> dict:
         schema_dict = self.schema().to_dict()

@@ -103,13 +103,23 @@ class MockStreamingASR(StreamingASRBase):
         self._closed = True
 
 
-def get_streaming_asr(backend: str = "mock") -> StreamingASRBase:
-    """Factory: returns the appropriate StreamingASR implementation."""
-    if backend == "deepgram":
-        try:
-            from .deepgram import DeepgramStreamingASR  # type: ignore[import]
+def get_streaming_asr(backend: str = "auto") -> StreamingASRBase:
+    """Factory: returns the appropriate StreamingASR implementation.
 
-            return DeepgramStreamingASR()
-        except (ImportError, ValueError):
-            pass
+    With backend='auto' (default), tries Deepgram first if DEEPGRAM_API_KEY
+    is set, then falls back to MockStreamingASR.
+    """
+    if backend in ("deepgram", "auto"):
+        try:
+            import os
+            if backend == "deepgram" or os.environ.get("DEEPGRAM_API_KEY"):
+                from .deepgram import DeepgramStreamingASR
+                return DeepgramStreamingASR()
+        except (ImportError, ValueError, Exception):
+            if backend == "deepgram":
+                # Requested Deepgram but unavailable — fall back to mock
+                return MockStreamingASR()
+    if backend not in ("auto", "mock"):
+        # Unknown backend — fall back to mock rather than crash
+        return MockStreamingASR()
     return MockStreamingASR()

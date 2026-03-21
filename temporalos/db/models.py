@@ -322,3 +322,40 @@ class ReviewItemRecord(Base):
     review_notes: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+# ── Phase N: Persistent Job Queue + Search Index ───────────────────────────────
+
+class JobRecord(Base):
+    """Persistent job queue — survives server restarts."""
+    __tablename__ = "jobs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)  # UUID
+    status: Mapped[str] = mapped_column(String(50), default="pending", index=True)
+    video_path: Mapped[str] = mapped_column(String(1024), default="")
+    frames_dir: Mapped[str] = mapped_column(String(1024), default="")
+    stages_done: Mapped[list] = mapped_column(JSON, default=list)
+    result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class SearchDocRecord(Base):
+    """Persistent search index documents — rebuilt into TF-IDF on startup."""
+    __tablename__ = "search_docs"
+
+    id: Mapped[str] = mapped_column(String(255), primary_key=True)  # video_id:timestamp_ms
+    video_id: Mapped[str] = mapped_column(String(255), index=True)
+    timestamp_ms: Mapped[int] = mapped_column(Integer)
+    timestamp_str: Mapped[str] = mapped_column(String(20), default="")
+    topic: Mapped[str] = mapped_column(String(255))
+    risk: Mapped[str] = mapped_column(String(50))
+    risk_score: Mapped[float] = mapped_column(Float)
+    objections: Mapped[list] = mapped_column(JSON, default=list)
+    decision_signals: Mapped[list] = mapped_column(JSON, default=list)
+    transcript: Mapped[str] = mapped_column(Text, default="")
+    model: Mapped[str] = mapped_column(String(100), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

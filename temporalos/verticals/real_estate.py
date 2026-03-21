@@ -1,7 +1,29 @@
 """Real Estate client consultation vertical pack."""
 from __future__ import annotations
+import re
+from typing import Dict, List
 from temporalos.schemas.registry import FieldDefinition, FieldType, SchemaDefinition
 from temporalos.verticals.base import VerticalPack
+
+_BUDGET_RE = re.compile(r"\$[\d,]+(?:k|m)?|\d+\s*(?:thousand|million|k)\b", re.IGNORECASE)
+_TIMELINE_SIGNALS = {
+    "immediately": {"asap", "right away", "immediately", "urgent", "this week"},
+    "1_month": {"next month", "30 days", "within a month", "couple weeks"},
+    "3_months": {"few months", "90 days", "quarter", "this quarter"},
+    "6_months": {"six months", "half year", "end of year"},
+    "just_browsing": {"just looking", "no rush", "browsing", "exploring"},
+}
+_OBJECTION_KEYWORDS = {"too small", "too big", "old", "noisy", "far from",
+                       "no parking", "no yard", "expensive", "needs work",
+                       "renovation", "outdated", "condition"}
+_PRIORITY_KEYWORDS = {"school", "bedroom", "bathroom", "garage", "kitchen",
+                      "backyard", "pool", "quiet", "walkable", "public transit",
+                      "downtown", "suburban", "modern", "open floor"}
+_FINANCING_SIGNALS = {
+    "pre_approved": {"pre-approved", "preapproved", "pre approved"},
+    "cash_buyer": {"cash offer", "cash buyer", "all cash", "no mortgage"},
+    "needs_mortgage": {"mortgage", "loan", "financing", "lender"},
+}
 
 
 class RealEstatePack(VerticalPack):
@@ -14,6 +36,45 @@ class RealEstatePack(VerticalPack):
     industries = ["Residential Real Estate", "Commercial Real Estate",
                   "Property Management", "Mortgage Brokerage"]
     summary_type = "real_estate_consult"
+
+    def extract(self, segment_data: Dict) -> Dict:
+        text = " ".join([
+            segment_data.get("topic", ""),
+            " ".join(segment_data.get("objections", [])),
+            " ".join(segment_data.get("decision_signals", [])),
+            segment_data.get("transcript", ""),
+        ]).lower()
+
+        # Budget signals
+        budget_matches = _BUDGET_RE.findall(text)
+        if budget_matches:
+            segment_data["budget_signals"] = budget_matches
+
+        # Timeline urgency
+        for level, keywords in _TIMELINE_SIGNALS.items():
+            if any(kw in text for kw in keywords):
+                segment_data["timeline_urgency"] = level
+                break
+        else:
+            segment_data["timeline_urgency"] = "flexible"
+
+        # Property objections
+        objections = [kw for kw in _OBJECTION_KEYWORDS if kw in text]
+        if objections:
+            segment_data["property_objections"] = objections
+
+        # Client priorities
+        priorities = [kw for kw in _PRIORITY_KEYWORDS if kw in text]
+        if priorities:
+            segment_data["client_priorities"] = priorities
+
+        # Financing status
+        for status, keywords in _FINANCING_SIGNALS.items():
+            if any(kw in text for kw in keywords):
+                segment_data["financing_status"] = status
+                break
+
+        return segment_data
 
     def schema(self) -> SchemaDefinition:
         return SchemaDefinition(

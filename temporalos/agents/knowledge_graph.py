@@ -16,24 +16,77 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
-# Simple keyword → entity type mapping
-_ENTITY_PATTERNS: List[Tuple[str, str]] = [
+# ── Entity extraction patterns ────────────────────────────────────────────────
+# Combine keyword matching with regex-based NER for richer extraction.
+
+_KEYWORD_PATTERNS: List[Tuple[str, str]] = [
     ("pricing", "topic"), ("discount", "topic"), ("contract", "topic"),
     ("demo", "topic"), ("pilot", "topic"), ("poc", "topic"),
     ("integration", "topic"), ("onboarding", "topic"),
+    ("budget", "topic"), ("timeline", "topic"), ("security", "topic"),
+    ("compliance", "topic"), ("migration", "topic"), ("support", "topic"),
+    ("roi", "topic"), ("implementation", "topic"), ("deployment", "topic"),
     ("competitor", "competitor"), ("alternative", "competitor"),
-    ("timeline", "temporal"), ("deadline", "temporal"), ("q1", "temporal"),
-    ("q2", "temporal"), ("q3", "temporal"), ("q4", "temporal"),
+    ("salesforce", "competitor"), ("hubspot", "competitor"),
+    ("gong", "competitor"), ("chorus", "competitor"), ("clari", "competitor"),
+    ("zoom", "product"), ("slack", "product"), ("teams", "product"),
+    ("deadline", "temporal"), ("q1", "temporal"), ("q2", "temporal"),
+    ("q3", "temporal"), ("q4", "temporal"), ("next quarter", "temporal"),
+    ("next month", "temporal"), ("this year", "temporal"), ("end of year", "temporal"),
 ]
+
+import re
+
+# Regex patterns for richer entity extraction
+_MONEY_RE = re.compile(r"\$[\d,]+(?:\.\d{2})?(?:\s*[KkMmBb])?|\d+(?:,\d{3})*\s*(?:dollars|USD)", re.I)
+_PERCENT_RE = re.compile(r"\d+(?:\.\d+)?%")
+_EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
+_ORG_SUFFIXES_RE = re.compile(
+    r"\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*\s+(?:Inc|Corp|LLC|Ltd|Co|Group|Solutions|Technologies|Software|Systems|Networks|Labs|Analytics))\b"
+)
+_PERSON_RE = re.compile(
+    r"\b((?:Mr|Mrs|Ms|Dr|CEO|CTO|VP|Director|Manager|Head)\s*\.?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b"
+)
+_DATE_RE = re.compile(
+    r"\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:,\s*\d{4})?\b"
+    r"|\b\d{1,2}/\d{1,2}/\d{2,4}\b"
+)
 
 
 def _extract_entities(text: str) -> List[Tuple[str, str]]:
-    """Cheap keyword-based entity extraction.  Returns (entity, entity_type) pairs."""
+    """Multi-strategy entity extraction: keywords + regex NER."""
     found: List[Tuple[str, str]] = []
     lower = text.lower()
-    for kw, etype in _ENTITY_PATTERNS:
+
+    # Keyword matches
+    for kw, etype in _KEYWORD_PATTERNS:
         if kw in lower:
             found.append((kw, etype))
+
+    # Money amounts
+    for m in _MONEY_RE.findall(text):
+        found.append((m.strip(), "money"))
+
+    # Percentages (often discounts, growth figures)
+    for m in _PERCENT_RE.findall(text):
+        found.append((m, "metric"))
+
+    # Email addresses
+    for m in _EMAIL_RE.findall(text):
+        found.append((m, "email"))
+
+    # Organization names
+    for m in _ORG_SUFFIXES_RE.findall(text):
+        found.append((m.strip(), "organization"))
+
+    # Person names (title-prefixed)
+    for m in _PERSON_RE.findall(text):
+        found.append((m.strip(), "person"))
+
+    # Dates
+    for m in _DATE_RE.findall(text):
+        found.append((m.strip(), "date"))
+
     return found
 
 

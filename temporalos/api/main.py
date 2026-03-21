@@ -75,7 +75,46 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await load_users_from_db()
         await load_tenants_from_db()
 
+        # Restore job queue + rebuild search index from DB
+        from .routes.process import load_jobs_from_db
+        await load_jobs_from_db()
+        await _rebuild_search_index_from_db(sf)
+
     yield
+
+
+async def _rebuild_search_index_from_db(session_factory) -> None:
+    """Rebuild the in-memory search index from persisted SearchDocRecords."""
+    try:
+        from ..db.models import SearchDocRecord
+        from ..search.indexer import IndexEntry, get_search_index
+        from sqlalchemy import select
+
+        idx = get_search_index()
+        async with session_factory() as sess:
+            rows = (await sess.execute(select(SearchDocRecord))).scalars().all()
+            for row in rows:
+                entry = IndexEntry(
+                    doc_id=row.id,
+                    video_id=row.video_id,
+                    timestamp_ms=row.timestamp_ms,
+                    timestamp_str="",
+                    topic=row.topic or "",
+                    risk=row.risk or "",
+                    risk_score=row.risk_score or 0.0,
+                    objections=row.objections or [],
+                    decision_signals=row.decision_signals or [],
+                    transcript=row.transcript or "",
+                    model=row.model or "",
+                )
+                idx.index(entry)
+        import logging
+        logging.getLogger(__name__).info(
+            "Rebuilt search index with %d documents", len(rows))
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            "Failed to rebuild search index: %s", exc)
 
 
 app = FastAPI(

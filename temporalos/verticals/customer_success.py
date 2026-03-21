@@ -1,7 +1,16 @@
 """Customer Success & Churn Prevention vertical pack."""
 from __future__ import annotations
+import re
+from typing import Dict, List
 from temporalos.schemas.registry import FieldDefinition, FieldType, SchemaDefinition
 from temporalos.verticals.base import VerticalPack
+
+_CHURN_KEYWORDS = {"cancel", "leave", "not renewing", "switching", "competitor",
+                   "expensive", "not using", "frustrated", "disappointed", "unhappy"}
+_EXPANSION_KEYWORDS = {"grow", "more seats", "expand", "add users", "new team",
+                       "rollout", "additional", "upgrade", "enterprise"}
+_EXEC_KEYWORDS = {"vp", "director", "c-suite", "ceo", "cfo", "cto", "executive",
+                  "sponsor", "decision maker"}
 
 
 class CustomerSuccessPack(VerticalPack):
@@ -14,6 +23,33 @@ class CustomerSuccessPack(VerticalPack):
     industries = ["SaaS", "Enterprise Software", "Financial Services",
                   "Healthcare SaaS", "EdTech", "HR Tech"]
     summary_type = "cs_qbr"
+
+    def extract(self, segment_data: Dict) -> Dict:
+        text = " ".join([
+            segment_data.get("topic", ""),
+            " ".join(segment_data.get("objections", [])),
+            " ".join(segment_data.get("decision_signals", [])),
+            segment_data.get("transcript", ""),
+        ]).lower()
+
+        churn_signals = [kw for kw in _CHURN_KEYWORDS if kw in text]
+        expansion_signals = [kw for kw in _EXPANSION_KEYWORDS if kw in text]
+        exec_present = any(kw in text for kw in _EXEC_KEYWORDS)
+
+        churn_count = len(churn_signals)
+        segment_data["churn_indicators"] = churn_signals
+        segment_data["expansion_signals"] = expansion_signals
+        segment_data["exec_sponsor_present"] = exec_present
+        segment_data["churn_risk"] = (
+            "high" if churn_count >= 2 else "medium" if churn_count == 1 else "low"
+        )
+        segment_data["churn_risk_score"] = min(churn_count * 0.3, 1.0)
+        segment_data["health_signal"] = (
+            "red" if churn_count >= 2
+            else "yellow" if churn_count >= 1 or not expansion_signals
+            else "green"
+        )
+        return segment_data
 
     def schema(self) -> SchemaDefinition:
         return SchemaDefinition(

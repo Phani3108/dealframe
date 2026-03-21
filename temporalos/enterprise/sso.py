@@ -76,10 +76,30 @@ class GoogleSSO(BaseSSOProvider):
         return f"{self.AUTH_URL}?{urlencode(params)}"
 
     async def exchange_code(self, code: str) -> SSOUser:
-        # In production, this would make HTTP requests to TOKEN_URL then USERINFO_URL
-        # For now, return placeholder — actual HTTP client (httpx) call in production
-        logger.info("Google SSO exchange_code called (needs httpx in production)")
-        raise NotImplementedError("Google SSO requires httpx for token exchange")
+        import urllib.request
+        import urllib.parse
+        import json as _json
+
+        # Exchange authorization code for tokens
+        token_data = urllib.parse.urlencode({
+            "code": code,
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "redirect_uri": self.redirect_uri,
+            "grant_type": "authorization_code",
+        }).encode()
+        req = urllib.request.Request(self.TOKEN_URL, data=token_data,
+                                     headers={"Content-Type": "application/x-www-form-urlencoded"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            tokens = _json.loads(resp.read())
+        access_token = tokens["access_token"]
+
+        # Fetch user profile
+        req2 = urllib.request.Request(self.USERINFO_URL,
+                                      headers={"Authorization": f"Bearer {access_token}"})
+        with urllib.request.urlopen(req2, timeout=15) as resp2:
+            data = _json.loads(resp2.read())
+        return self.parse_userinfo(data)
 
     @staticmethod
     def parse_userinfo(data: Dict[str, Any]) -> SSOUser:
@@ -117,8 +137,30 @@ class MicrosoftSSO(BaseSSOProvider):
         return f"{base}?{urlencode(params)}"
 
     async def exchange_code(self, code: str) -> SSOUser:
-        logger.info("Microsoft SSO exchange_code called (needs httpx in production)")
-        raise NotImplementedError("Microsoft SSO requires httpx for token exchange")
+        import urllib.request
+        import urllib.parse
+        import json as _json
+
+        token_url = self.TOKEN_URL_TEMPLATE.format(tenant=self.tenant)
+        token_data = urllib.parse.urlencode({
+            "code": code,
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "redirect_uri": self.redirect_uri,
+            "grant_type": "authorization_code",
+            "scope": "openid email profile User.Read",
+        }).encode()
+        req = urllib.request.Request(token_url, data=token_data,
+                                     headers={"Content-Type": "application/x-www-form-urlencoded"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            tokens = _json.loads(resp.read())
+        access_token = tokens["access_token"]
+
+        req2 = urllib.request.Request(self.USERINFO_URL,
+                                      headers={"Authorization": f"Bearer {access_token}"})
+        with urllib.request.urlopen(req2, timeout=15) as resp2:
+            data = _json.loads(resp2.read())
+        return self.parse_userinfo(data)
 
     @staticmethod
     def parse_userinfo(data: Dict[str, Any]) -> SSOUser:
@@ -150,8 +192,30 @@ class OktaSSO(BaseSSOProvider):
         return f"{self.okta_domain}/oauth2/v1/authorize?{urlencode(params)}"
 
     async def exchange_code(self, code: str) -> SSOUser:
-        logger.info("Okta SSO exchange_code called (needs httpx in production)")
-        raise NotImplementedError("Okta SSO requires httpx for token exchange")
+        import urllib.request
+        import urllib.parse
+        import json as _json
+
+        token_url = f"{self.okta_domain}/oauth2/v1/token"
+        token_data = urllib.parse.urlencode({
+            "code": code,
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "redirect_uri": self.redirect_uri,
+            "grant_type": "authorization_code",
+        }).encode()
+        req = urllib.request.Request(token_url, data=token_data,
+                                     headers={"Content-Type": "application/x-www-form-urlencoded"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            tokens = _json.loads(resp.read())
+        access_token = tokens["access_token"]
+
+        userinfo_url = f"{self.okta_domain}/oauth2/v1/userinfo"
+        req2 = urllib.request.Request(userinfo_url,
+                                      headers={"Authorization": f"Bearer {access_token}"})
+        with urllib.request.urlopen(req2, timeout=15) as resp2:
+            data = _json.loads(resp2.read())
+        return self.parse_userinfo(data)
 
     @staticmethod
     def parse_userinfo(data: Dict[str, Any]) -> SSOUser:

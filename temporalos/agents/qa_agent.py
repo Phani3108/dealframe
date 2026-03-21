@@ -114,7 +114,10 @@ class VideoQAAgent:
 
     def ask(self, question: str,
             filter_job_id: Optional[str] = None) -> QAAnswer:
-        """Answer a natural language question over indexed videos."""
+        """Answer a natural language question over indexed videos.
+
+        Tries LLM synthesis first; falls back to rule-based if no LLM configured.
+        """
         filter_meta = {"job_id": filter_job_id} if filter_job_id else None
         hits = self._store.search(question, top_k=self.top_k, filter_meta=filter_meta)
 
@@ -147,10 +150,44 @@ class VideoQAAgent:
                 excerpt=m.get("transcript_excerpt", ""),
             ))
 
-        # Mock answer synthesis (replace with LLM call in production)
-        answer = self._synthesize_mock(question, hits)
+        # Try LLM synthesis, fall back to rule-based
+        answer, model = self._synthesize(question, hits, context_blocks)
 
-        return QAAnswer(question=question, answer=answer, citations=citations)
+        return QAAnswer(question=question, answer=answer, citations=citations, model=model)
+
+    def _synthesize(self, question: str, hits: list,
+                    context_blocks: List[str]) -> tuple:
+        """Try LLM synthesis; fall back to mock."""
+        try:
+            import asyncio
+            from temporalos.llm.router import get_llm, MockLLMProvider
+            llm = get_llm()
+            if not isinstance(llm, MockLLMProvider):
+                context = "\n\n".join(context_blocks)
+                prompt = (
+                    f"Based on the following video call data, answer this question:\n\n"
+                    f"Question: {question}\n\n"
+                    f"Relevant segments:\n{context}\n\n"
+                    f"Provide a concise, specific answer with references to the data."
+                )
+                system = "You are a video intelligence analyst. Answer questions based on the call data provided."
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        # We're in a sync context called from async — use thread
+                        import concurrent.futures
+                        with concurrent.futures.ThreadPoolExecutor() as pool:
+                            resp = pool.submit(
+                                lambda: asyncio.run(llm.complete(prompt, system=system))
+                            ).result(timeout=30)
+                    else:
+                        resp = loop.run_until_complete(llm.complete(prompt, system=system))
+                    return resp.text, resp.model
+                except Exception as exc:
+                    logger.warning("LLM synthesis failed, using rule-based: %s", exc)
+        except Exception:
+            pass
+        return self._synthesize_mock(question, hits), "rule-based"
 
     def _synthesize_mock(self, question: str,
                          hits: list) -> str:
@@ -192,7 +229,7 @@ class VideoQAAgent:
         # Generic summary
         return (
             f"Found {len(hits)} relevant moment(s) covering topics: "
-            f"{', '.join(dict.fromkeys(topics)[:3])}. "
+            f"{', '.join(list(dict.fromkeys(topics))[:3])}. "
             f"Risk level: {round(avg_risk * 100)}%. "
             + (f"Objections: {'; '.join(unique_obj[:3])}." if unique_obj else "")
         )

@@ -1,7 +1,17 @@
 """UX Research vertical pack."""
 from __future__ import annotations
+from typing import Dict, List
 from temporalos.schemas.registry import FieldDefinition, FieldType, SchemaDefinition
 from temporalos.verticals.base import VerticalPack
+
+_PAIN_KEYWORDS = {"frustrating", "annoying", "difficult", "hard to", "can't find",
+                  "confusing", "broken", "doesn't work", "bug", "slow"}
+_DELIGHT_KEYWORDS = {"love", "great", "amazing", "easy", "intuitive", "perfect",
+                     "awesome", "exactly what", "impressed"}
+_CONFUSION_KEYWORDS = {"confused", "don't understand", "what does", "where is",
+                       "how do i", "lost", "unclear", "not sure"}
+_FEATURE_KEYWORDS = {"wish", "it would be nice", "should have", "need", "want",
+                     "missing", "add", "feature request"}
 
 
 class UXResearchPack(VerticalPack):
@@ -14,6 +24,33 @@ class UXResearchPack(VerticalPack):
     industries = ["Product Management", "UX Design", "SaaS", "Consumer Apps",
                   "Healthcare UX", "Fintech", "EdTech"]
     summary_type = "ux_research"
+
+    def extract(self, segment_data: Dict) -> Dict:
+        text = " ".join([
+            segment_data.get("topic", ""),
+            " ".join(segment_data.get("objections", [])),
+            segment_data.get("transcript", ""),
+        ]).lower()
+
+        pain = [kw for kw in _PAIN_KEYWORDS if kw in text]
+        delight = [kw for kw in _DELIGHT_KEYWORDS if kw in text]
+        confusion = [kw for kw in _CONFUSION_KEYWORDS if kw in text]
+        features = [kw for kw in _FEATURE_KEYWORDS if kw in text]
+
+        segment_data["pain_points"] = segment_data.get("pain_points", []) + pain
+        segment_data["delight_moments"] = delight
+        segment_data["confusion_signals"] = confusion
+        segment_data["feature_requests"] = segment_data.get("feature_requests", []) + features
+
+        if pain or confusion:
+            segment_data["segment_type"] = "pain_point" if pain else "confusion"
+            segment_data["severity"] = "major" if len(pain) >= 2 else "minor"
+        elif delight:
+            segment_data["segment_type"] = "delight"
+        elif features:
+            segment_data["segment_type"] = "feature_request"
+
+        return segment_data
 
     def schema(self) -> SchemaDefinition:
         return SchemaDefinition(

@@ -176,12 +176,42 @@ def generate_clips(job_id: str, segments: List[Dict[str, Any]],
 
 def build_reel(name: str, job_id: str, segments: List[Dict[str, Any]],
                categories: Optional[List[str]] = None,
-               max_clips: int = 20) -> ClipReel:
-    """Build a complete clip reel."""
+               max_clips: int = 20,
+               video_path: Optional[str] = None) -> ClipReel:
+    """Build a complete clip reel.
+
+    If *video_path* is provided and FFmpeg is available, actual video clips
+    are extracted to disk.  Otherwise only metadata is produced.
+    """
     clips = generate_clips(job_id, segments, categories, max_clips)
     # Sort clips by time for reel playback order
     clips.sort(key=lambda c: c.start_ms)
     total_ms = sum(c.end_ms - c.start_ms for c in clips)
+
+    # Attempt real FFmpeg extraction when a video file is available
+    if video_path:
+        try:
+            from ..clips.extractor import ClipSpec, get_clip_extractor
+            import os
+            if os.path.exists(video_path):
+                extractor = get_clip_extractor()
+                for clip in clips:
+                    try:
+                        spec = ClipSpec(
+                            label=clip.title[:20],
+                            start_ms=clip.start_ms,
+                            end_ms=clip.end_ms,
+                            risk_score=clip.score,
+                            topic=clip.metadata.get("topic", ""),
+                        )
+                        result = extractor.extract(video_path, job_id, spec)
+                        clip.metadata["clip_path"] = str(result.path)
+                        clip.metadata["clip_size_bytes"] = result.size_bytes
+                    except Exception:
+                        pass  # FFmpeg not installed or failed — metadata only
+        except Exception:
+            pass
+
     return ClipReel(
         id=uuid.uuid4().hex[:10],
         name=name,

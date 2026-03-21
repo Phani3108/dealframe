@@ -48,7 +48,12 @@ async def index_video(video_id: str) -> dict:
 @router.get("/insights/patterns")
 async def win_loss_patterns() -> dict:
     """Win/loss objection patterns across all indexed videos."""
-    patterns = PortfolioInsights.win_loss_patterns([])
+    from ..routes.process import _jobs
+    intels = [
+        j["result"] for j in _jobs.values()
+        if j.get("status") == "completed" and j.get("result")
+    ]
+    patterns = PortfolioInsights.win_loss_patterns(intels)
     return patterns.to_dict()
 
 

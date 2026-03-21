@@ -16,7 +16,7 @@ from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from ...audio.streaming import MockStreamingASR
+from ...audio.streaming import get_streaming_asr
 from ...pipeline.streaming_pipeline import StreamingPipeline
 
 router = APIRouter(tags=["streaming"])
@@ -27,13 +27,15 @@ async def stream_process(websocket: WebSocket) -> None:
     """
     WebSocket endpoint for real-time speech → structured intelligence.
 
-    The backend uses MockStreamingASR by default (no Deepgram API key required).
-    Swap to DeepgramStreamingASR by setting DEEPGRAM_API_KEY in the environment.
+    Auto-detects the best ASR backend:
+    - Deepgram (if DEEPGRAM_API_KEY is set)
+    - Mock (deterministic fallback for dev/test)
     """
     await websocket.accept()
     session_id = str(uuid.uuid4())
     audio_queue: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=100)
-    pipeline = StreamingPipeline(asr=MockStreamingASR())
+    asr = get_streaming_asr()  # Auto-detects real vs mock
+    pipeline = StreamingPipeline(asr=asr)
 
     async def _push_results() -> None:
         async for result in pipeline.process(audio_queue):
