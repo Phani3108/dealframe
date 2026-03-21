@@ -3,8 +3,8 @@ const puppeteer = require('/tmp/ss/node_modules/puppeteer')
 const path = require('path')
 const fs = require('fs')
 
-const BASE = 'http://localhost:3004'
-const OUT = path.join(__dirname, 'docs/screenshots')
+const BASE = 'http://localhost:3001'
+const OUT = path.resolve(__dirname, '..', 'docs', 'screenshots')
 fs.mkdirSync(OUT, { recursive: true })
 
 const PAGES = [
@@ -31,8 +31,8 @@ const PAGES = [
   for (const { name, url, title } of PAGES) {
     try {
       const page = await browser.newPage()
-      await page.goto(`${BASE}${url}`, { waitUntil: 'networkidle2', timeout: 10000 })
-      await new Promise(r => setTimeout(r, 800)) // let animations settle
+      await page.goto(`${BASE}${url}`, { waitUntil: 'networkidle2', timeout: 15000 })
+      await new Promise(r => setTimeout(r, 2000)) // let animations + API calls settle
       const file = path.join(OUT, `${name}.png`)
       await page.screenshot({ path: file, fullPage: false })
       console.log(`✓ ${title} → ${name}.png`)
