@@ -141,14 +141,14 @@ class TestProcurementSchema:
 
     def test_field_count(self, procurement_pack):
         schema = procurement_pack.schema()
-        assert len(schema.fields) >= 18, "Procurement pack should have 18+ fields"
+        assert len(schema.fields) >= 25, "Procurement pack should have 25+ fields (incl. game theory)"
 
     def test_to_dict(self, procurement_pack):
         d = procurement_pack.to_dict()
         assert d["id"] == "procurement"
         assert d["name"] == "Procurement & Supplier Intelligence"
         assert "Manufacturing" in d["industries"]
-        assert d["field_count"] >= 18
+        assert d["field_count"] >= 25
 
 
 # ── Extraction Tests ──────────────────────────────────────────────────────────
@@ -391,6 +391,9 @@ class TestProcurementPipelineIntegration:
             "sla_commitments_discussed", "negotiation_stage",
             "clause_objections", "alternative_supplier_signals",
             "tco_signals", "maverick_spend_risk",
+            # Game theory fields
+            "negotiation_tactics", "power_balance", "batna_assessment",
+            "escalation_level", "bargaining_style", "issues_on_table",
         ]
         for key in expected_keys:
             assert key in result, f"Missing key: {key}"

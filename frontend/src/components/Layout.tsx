@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -26,69 +26,113 @@ import {
   Bot,
   ShieldCheck,
   Bell,
+  ChevronRight,
 } from 'lucide-react'
 import { getNotifications, markAllNotificationsRead } from '../api/client'
 
-const navGroups = [
+export type ExperienceTier = 'essentials' | 'pro' | 'power'
+
+/** Each nav item declares the minimum tier required to display it. */
+interface NavItem {
+  to: string
+  label: string
+  icon: typeof LayoutDashboard
+  tier: ExperienceTier
+}
+
+interface NavGroup {
+  label: string
+  items: NavItem[]
+}
+
+const navGroups: NavGroup[] = [
   {
     label: 'Core',
     items: [
-      { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-      { to: '/upload', label: 'Upload & Process', icon: Upload },
-      { to: '/observatory', label: 'Observatory', icon: Eye },
+      { to: '/', label: 'Dashboard', icon: LayoutDashboard, tier: 'essentials' },
+      { to: '/upload', label: 'Upload & Process', icon: Upload, tier: 'essentials' },
+      { to: '/search', label: 'Search', icon: Search, tier: 'essentials' },
     ],
   },
   {
     label: 'Intelligence',
     items: [
-      { to: '/intelligence', label: 'Analytics', icon: Brain },
-      { to: '/search', label: 'Search', icon: Search },
-      { to: '/patterns', label: 'Pattern Miner', icon: TrendingUp },
-      { to: '/diff', label: 'Diff Engine', icon: GitCompare },
-    ],
-  },
-  {
-    label: 'Capabilities',
-    items: [
-      { to: '/chat', label: 'Ask Library', icon: MessageSquare },
-      { to: '/coaching', label: 'Coaching', icon: Target },
-      { to: '/copilot', label: 'Live Copilot', icon: Bot },
-      { to: '/batch', label: 'Batch', icon: Layers },
-      { to: '/meeting-prep', label: 'Meeting Prep', icon: Calendar },
-      { to: '/knowledge-graph', label: 'Knowledge Graph', icon: Network },
-      { to: '/schema-builder', label: 'Schema Builder', icon: Settings },
+      { to: '/intelligence', label: 'Analytics', icon: Brain, tier: 'pro' },
+      { to: '/coaching', label: 'Coaching', icon: Target, tier: 'pro' },
+      { to: '/chat', label: 'Ask Library', icon: MessageSquare, tier: 'pro' },
+      { to: '/copilot', label: 'Live Copilot', icon: Bot, tier: 'pro' },
+      { to: '/meeting-prep', label: 'Meeting Prep', icon: Calendar, tier: 'pro' },
+      { to: '/batch', label: 'Batch', icon: Layers, tier: 'pro' },
+      { to: '/patterns', label: 'Pattern Miner', icon: TrendingUp, tier: 'power' },
+      { to: '/diff', label: 'Diff Engine', icon: GitCompare, tier: 'power' },
+      { to: '/knowledge-graph', label: 'Knowledge Graph', icon: Network, tier: 'power' },
     ],
   },
   {
     label: 'Models',
     items: [
-      { to: '/finetuning', label: 'Fine-tuning', icon: Zap },
-      { to: '/local', label: 'Local Pipeline', icon: Cpu },
-      { to: '/streaming', label: 'Live Stream', icon: Radio },
+      { to: '/observatory', label: 'Observatory', icon: Eye, tier: 'power' },
+      { to: '/finetuning', label: 'Fine-tuning', icon: Zap, tier: 'power' },
+      { to: '/local', label: 'Local Pipeline', icon: Cpu, tier: 'power' },
+      { to: '/streaming', label: 'Live Stream', icon: Radio, tier: 'power' },
+      { to: '/schema-builder', label: 'Schema Builder', icon: Settings, tier: 'power' },
     ],
   },
   {
     label: 'Platform',
     items: [
-      { to: '/observability', label: 'Observability', icon: BarChart3 },
-      { to: '/integrations', label: 'Connections', icon: Plug },
-      { to: '/annotations', label: 'Annotations', icon: MessageSquareText },
-      { to: '/review-queue', label: 'Review Queue', icon: ListChecks },
-      { to: '/audit-log', label: 'Audit Log', icon: Shield },
-      { to: '/admin', label: 'Admin', icon: ShieldCheck },
-      { to: '/settings', label: 'Settings', icon: Settings },
+      { to: '/integrations', label: 'Connections', icon: Plug, tier: 'pro' },
+      { to: '/observability', label: 'Observability', icon: BarChart3, tier: 'power' },
+      { to: '/annotations', label: 'Annotations', icon: MessageSquareText, tier: 'power' },
+      { to: '/review-queue', label: 'Review Queue', icon: ListChecks, tier: 'power' },
+      { to: '/audit-log', label: 'Audit Log', icon: Shield, tier: 'power' },
+      { to: '/admin', label: 'Admin', icon: ShieldCheck, tier: 'power' },
+      { to: '/settings', label: 'Settings', icon: Settings, tier: 'essentials' },
     ],
   },
 ]
+
+const TIER_ORDER: Record<ExperienceTier, number> = { essentials: 0, pro: 1, power: 2 }
+
+export function getStoredTier(): ExperienceTier {
+  try {
+    const stored = localStorage.getItem('dealframe_tier')
+    if (stored && stored in TIER_ORDER) return stored as ExperienceTier
+  } catch { /* SSR-safe */ }
+  return 'essentials'
+}
+
+export function setStoredTier(tier: ExperienceTier) {
+  try { localStorage.setItem('dealframe_tier', tier) } catch { /* SSR-safe */ }
+}
 
 interface LayoutProps {
   children: React.ReactNode
 }
 
 export function Layout({ children }: LayoutProps) {
+  const [tier, setTier] = useState<ExperienceTier>(getStoredTier)
   const [unread, setUnread] = useState(0)
   const [showNotifs, setShowNotifs] = useState(false)
   const [notifs, setNotifs] = useState<Array<{ id: string; type: string; title: string; message: string; read: boolean; created_at: number }>>([])
+
+  // Listen for tier changes from Settings page
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'dealframe_tier') setTier(getStoredTier())
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
+  // Also poll localStorage so same-tab changes from Settings are picked up
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const current = getStoredTier()
+      setTier(prev => prev !== current ? current : prev)
+    }, 500)
+    return () => clearInterval(iv)
+  }, [])
 
   useEffect(() => {
     getNotifications('default', true)
@@ -108,6 +152,16 @@ export function Layout({ children }: LayoutProps) {
     setNotifs([])
   }
 
+  /** Filter nav groups to only show items at or below the current tier. */
+  const filteredGroups = useMemo(() => {
+    const threshold = TIER_ORDER[tier]
+    return navGroups
+      .map(g => ({ ...g, items: g.items.filter(i => TIER_ORDER[i.tier] <= threshold) }))
+      .filter(g => g.items.length > 0)
+  }, [tier])
+
+  const tierLabel: Record<ExperienceTier, string> = { essentials: 'Essentials', pro: 'Pro', power: 'Power' }
+
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       {/* Dark Sidebar */}
@@ -119,15 +173,15 @@ export function Layout({ children }: LayoutProps) {
               <Activity className="w-5 h-5 text-white" />
             </div>
             <div>
-              <p className="font-bold text-white text-sm leading-tight tracking-tight">TemporalOS</p>
-              <p className="text-[10px] text-slate-500 leading-tight mt-0.5">Decision Intelligence</p>
+              <p className="font-bold text-white text-sm leading-tight tracking-tight">DealFrame</p>
+              <p className="text-[10px] text-slate-500 leading-tight mt-0.5">Negotiation Intelligence</p>
             </div>
           </div>
         </div>
 
-        {/* Nav */}
+        {/* Nav — filtered by experience tier */}
         <nav className="flex-1 px-3 py-4 overflow-y-auto">
-          {navGroups.map(({ label, items }) => (
+          {filteredGroups.map(({ label, items }) => (
             <div key={label} className="mb-5">
               <p className="px-2.5 mb-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-600">
                 {label}
@@ -153,10 +207,30 @@ export function Layout({ children }: LayoutProps) {
               </div>
             </div>
           ))}
+
+          {/* Tier upgrade prompt */}
+          {tier !== 'power' && (
+            <NavLink
+              to="/settings"
+              className="flex items-center gap-2 px-2.5 py-2 mt-2 rounded-lg text-[11px] text-indigo-400/70 hover:text-indigo-300 hover:bg-white/[0.04] transition-all"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+              <span>Unlock more in Settings</span>
+            </NavLink>
+          )}
         </nav>
 
-        {/* Footer */}
+        {/* Tier badge + Footer */}
         <div className="px-4 py-4 border-t border-white/[0.06]">
+          <div className="flex items-center gap-2 mb-3">
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+              tier === 'power' ? 'bg-violet-500/20 text-violet-300' :
+              tier === 'pro' ? 'bg-indigo-500/20 text-indigo-300' :
+              'bg-slate-500/20 text-slate-400'
+            }`}>
+              {tierLabel[tier]}
+            </span>
+          </div>
           <a
             href="/docs"
             target="_blank"

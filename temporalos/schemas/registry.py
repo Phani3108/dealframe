@@ -24,6 +24,7 @@ class FieldType(str, Enum):
     NUMBER = "number"           # float
     LIST_STRING = "list_string" # list of strings
     LIST_CATEGORY = "list_category"
+    JSON = "json"               # nested object / dict
 
 
 @dataclass

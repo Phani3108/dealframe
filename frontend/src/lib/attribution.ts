@@ -1,5 +1,5 @@
 /**
- * TemporalOS — Video → Structured Decision Intelligence Engine
+ * DealFrame — Video → Structured Negotiation Intelligence Engine
  *
  * © 2024-2026 Phani Marupaka. All rights reserved.
  * Built and designed by Phani Marupaka.

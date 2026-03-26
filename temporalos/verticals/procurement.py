@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from typing import Dict, List
 
+from temporalos.intelligence.negotiation import enrich_segment_negotiation_intel
 from temporalos.schemas.registry import FieldDefinition, FieldType, SchemaDefinition
 from temporalos.verticals.base import VerticalPack
 
@@ -193,6 +194,9 @@ class ProcurementPack(VerticalPack):
         maverick = any(kw in text for kw in _MAVERICK_KEYWORDS)
         segment_data["maverick_spend_risk"] = maverick
 
+        # --- Negotiation Intelligence (Game Theory layer) ---
+        enrich_segment_negotiation_intel(segment_data)
+
         return segment_data
 
     def schema(self) -> SchemaDefinition:
@@ -301,6 +305,47 @@ class ProcurementPack(VerticalPack):
                 FieldDefinition(
                     "maverick_spend_risk", FieldType.BOOLEAN,
                     "Off-contract or non-compliant purchasing risk detected",
+                    required=False,
+                ),
+                # --- Negotiation Intelligence (Game Theory) fields ---
+                FieldDefinition(
+                    "negotiation_tactics", FieldType.LIST_STRING,
+                    "Detected negotiation tactics (anchoring, time_pressure, logrolling, "
+                    "walkaway_threat, nibbling, good_cop_bad_cop, highball_lowball, etc.)",
+                    required=False,
+                ),
+                FieldDefinition(
+                    "power_balance", FieldType.JSON,
+                    "Buyer vs. supplier leverage analysis "
+                    "{buyer_leverage, supplier_leverage, dominant_party, leverage_drivers}",
+                    required=False,
+                ),
+                FieldDefinition(
+                    "batna_assessment", FieldType.JSON,
+                    "Best Alternative to Negotiated Agreement signals for both parties",
+                    required=False,
+                ),
+                FieldDefinition(
+                    "escalation_level", FieldType.CATEGORY,
+                    "Escalation state of this segment",
+                    options=["escalating", "de_escalating", "stable"],
+                    required=False,
+                ),
+                FieldDefinition(
+                    "bargaining_style", FieldType.CATEGORY,
+                    "Integrative (expanding the pie) vs. distributive (splitting it)",
+                    options=["integrative", "distributive", "mixed"],
+                    required=False,
+                ),
+                FieldDefinition(
+                    "issues_on_table", FieldType.LIST_STRING,
+                    "Active negotiation issues detected (price, delivery, quality, "
+                    "contract_terms, compliance, sla, relationship)",
+                    required=False,
+                ),
+                FieldDefinition(
+                    "integrative_signals", FieldType.LIST_STRING,
+                    "Value-creation and pie-expanding language detected",
                     required=False,
                 ),
             ],

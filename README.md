@@ -1,4 +1,4 @@
-# TemporalOS — Video → Decision Intelligence
+# DealFrame — Video → Negotiation Intelligence
 
 > Turn any recorded call, demo, or meeting into structured, machine-readable intelligence — instantly.
 

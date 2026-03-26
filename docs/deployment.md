@@ -1,12 +1,12 @@
-# TemporalOS Deployment Guide
+# DealFrame Deployment Guide
 
 ## Quick Start (Docker Compose)
 
-The fastest way to get TemporalOS running:
+The fastest way to get DealFrame running:
 
 ```bash
 # Clone and configure
-git clone <repo-url> && cd TemporalOS
+git clone <repo-url> && cd DealFrame
 cp .env.example .env   # Edit with your keys
 
 # Launch all services
@@ -199,7 +199,7 @@ pytest --cov=temporalos --cov-report=html
 
 ## Monitoring
 
-TemporalOS includes built-in OpenTelemetry instrumentation:
+DealFrame includes built-in OpenTelemetry instrumentation:
 - **Metrics**: Pipeline latency, extraction accuracy, segment counts
 - **Traces**: Full request tracing across processing stages
 - **Drift Detection**: Automatic alerts when model output distribution shifts

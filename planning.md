@@ -1,6 +1,6 @@
-# TemporalOS — Planning & Architecture
+# DealFrame — Planning & Architecture
 
-> Last updated: 2026-03-21
+> Last updated: 2026-03-26
 
 > **See [EXPANSION.md](./EXPANSION.md) for the full expansion vision — industries, integrations, user tiers, and the 5-phase build plan.**
 
@@ -8,7 +8,7 @@
 
 ## 1. Vision Statement
 
-Transform raw video into structured, queryable decision intelligence. A sales call isn't just audio — it's a timestamped graph of intent, objection, sentiment, and visual context. TemporalOS makes that graph machine-consumable.
+Transform raw video into structured, queryable negotiation intelligence. A sales call isn't just audio — it's a timestamped graph of intent, objection, sentiment, and visual context. DealFrame makes that graph machine-consumable.
 
 ---
 
@@ -359,12 +359,12 @@ and real enterprise readiness — in that order.**
 ---
 
 ### ✅ Phase G: Competitive Moats — COMPLETE (41 tests passing)
-*Features no competitor has. This is what makes TemporalOS top 1%.*
+*Features no competitor has. This is what makes DealFrame top 1%.*
 
 | # | Component | What it does | Why it's unique |
 |---|-----------|-------------|----------------|
 | G1 | **Temporal Diff Engine** | Compare two calls with the same company. Semantic diff: new objections, resolved concerns, risk trajectory, topic evolution. Visual side-by-side. | **Nobody has call-to-call semantic diff.** Gong tracks keywords over time but can't show "what changed between call 3 and call 4 with Acme." |
-| G2 | **Franchise Mode** | Auto-detect vertical from content (sales call? UX interview? legal deposition?) and apply the right schema automatically. One instance, multiple verticals. | **Nobody auto-classifies and adapts.** Gong=sales-only. Dovetail=UX-only. TemporalOS adapts to any content. |
+| G2 | **Franchise Mode** | Auto-detect vertical from content (sales call? UX interview? legal deposition?) and apply the right schema automatically. One instance, multiple verticals. | **Nobody auto-classifies and adapts.** Gong=sales-only. Dovetail=UX-only. DealFrame adapts to any content. |
 | G3 | **Cross-Call Pattern Mining** | Statistical patterns across library: "Calls mentioning competitor X close 30% less" or "Reps asking 5+ questions have 2x win rate." Automated insight generation. | **Nobody does causal pattern mining.** Current tools show counts; this finds correlations that change behavior. |
 | G4 | **Live Call Copilot** | During live call (WebSocket stream), surface real-time coaching: "Prospect mentioned competitor — here's your battlecard" or "Risk rising — ask about timeline." Overlay UI. | **Real-time AI coaching during the call.** Gong does post-call only. This changes the outcome while it's happening. |
 | G5 | **Visual Intelligence** | When prospect shares screen, extract structured data from visual frames: pricing pages, competitor dashboards, org charts. "Prospect was viewing Competitor X at $299/mo." | **Nobody extracts intel from shared screen content.** Turns screen-share into competitive intelligence. |
@@ -421,7 +421,7 @@ and real enterprise readiness — in that order.**
 
 | # | Component | What it does |
 |---|-----------|-------------|
-| M1 | **Python SDK** | Zero-dependency TemporalOSClient with 13 typed methods, dataclass results, error handling |
+| M1 | **Python SDK** | Zero-dependency DealFrameClient with 13 typed methods, dataclass results, error handling |
 | M2 | **Deployment Guide** | Docker, env vars, local dev, production (Nginx, probes), storage, monitoring |
 | M3 | **Architecture Docs** | System diagram, module map, all 28 routes, 25 pages, data flow, tech stack |
 | M4 | **API Reference** | All endpoints with request/response examples, auth guide, SDK usage |

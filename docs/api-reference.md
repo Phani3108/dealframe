@@ -1,4 +1,4 @@
-# TemporalOS API Reference
+# DealFrame API Reference
 
 ## Base URL
 
@@ -211,9 +211,9 @@ GET /health/ready # Readiness (checks DB connection)
 ## Python SDK
 
 ```python
-from temporalos_sdk import TemporalOSClient
+from temporalos_sdk import DealFrameClient
 
-client = TemporalOSClient("http://localhost:8000", api_key="your-token")
+client = DealFrameClient("http://localhost:8000", api_key="your-token")
 
 # Upload and process
 job = client.upload("meeting.mp4")

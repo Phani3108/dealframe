@@ -1,4 +1,4 @@
-# TemporalOS — Task Log
+# DealFrame — Task Log
 
 > Every prompt, every task, every decision — tracked here.
 
@@ -18,6 +18,60 @@
 ---
 
 ## Active Tasks
+
+### TASK-030: DealFrame Rename + Progressive Disclosure UX
+- **Status**: 🟢 Completed
+- **Date**: 2026-03-26
+- **Prompt/Trigger**: User: "We'll call this DealFrame. And let's implement the rest of suggestions." (3-tier nav, negotiation intel in SegmentCard, negotiation report tab, experience tier toggle)
+- **Work Done**:
+  - **Brand rename**: TemporalOS → DealFrame across ~25 user-facing files (README, docs, config, helm, SDK, frontend, CI, EXPANSION.md, planning.md, tasks.md). Python package directory `temporalos/` deliberately kept unchanged to avoid 200+ import rewrites.
+  - **3-Tier Navigation (Layout.tsx)**: Every nav item tagged with `tier: 'essentials' | 'pro' | 'power'`. Sidebar filters items by stored tier from `dealframe_tier` localStorage. Essentials: Dashboard, Upload, Search, Settings (4 items). Pro: +Analytics, Coaching, Ask Library, Copilot, Meeting Prep, Batch, Connections. Power: +all remaining (Fine-tuning, Observatory, Local Pipeline, Streaming, Schema Builder, Observability, Pattern Miner, Diff Engine, Knowledge Graph, Annotations, Review Queue, Audit Log, Admin). Includes tier badge in footer and "Unlock more in Settings" prompt.
+  - **Experience Tier Toggle (SettingsPage.tsx)**: New "Experience Tier" section with 3 radio-style buttons (Essentials/Pro/Power) with descriptions. Persists to localStorage, Layout.tsx polls for changes.
+  - **Negotiation Intel in SegmentCard**: New expandable violet-themed section showing: tactic chips, power balance bar, BATNA buyer/supplier strength, escalation badge, bargaining style, issue count. Only renders when negotiation fields are present.
+  - **Negotiation Report Tab (Results.tsx)**: 5th tab aggregating session-level intel: avg power balance gauge, BATNA strength bars, peak escalation + dominant style + integrative signal count, tactics frequency grid, issues on table chips. Uses `useMemo` for efficient aggregation.
+  - **ExtractionResult type extended** (`api/client.ts`): 7 optional negotiation fields added to match backend procurement schema.
+- **Files Changed**:
+  - Modified: `frontend/src/components/Layout.tsx`, `frontend/src/components/SegmentCard.tsx`, `frontend/src/pages/Results.tsx`, `frontend/src/pages/SettingsPage.tsx`, `frontend/src/api/client.ts`
+  - Modified (rename only): `README.md`, `claude.md`, `planning.md`, `EXPANSION.md`, `tasks.md`, `config/settings.yaml`, `pyproject.toml`, `docs/api-reference.md`, `docs/architecture.md`, `docs/deployment.md`, `helm/temporalos/Chart.yaml`, `sdk/pyproject.toml`, `frontend/index.html`, `frontend/src/pages/Integrations.tsx`, `frontend/src/lib/attribution.ts`, `.github/workflows/ci.yml`
+- **Tests**: 833 passed, 16 pre-existing failures, 0 regressions. Frontend TypeScript compiles clean.
+
+### TASK-029: Negotiation Intelligence — Game Theory & Behavioral Economics Layer (47 tests)
+- **Status**: 🟢 Completed
+- **Date**: 2026-03-26
+- **Prompt/Trigger**: User: "In negotiations it's important to factor in frameworks like Nash equilibrium, Game theory, not stopping at a No, trying to push for the full picture... Is this something that can be included into TemporalOS?"
+- **Work Done**:
+  - **NegotiationAnalyzer module** (`temporalos/intelligence/negotiation.py`): ~600-line game theory and behavioral economics analysis engine with:
+    - **Tactic Detection**: 10-tactic taxonomy (anchoring, time_pressure, nibbling, good_cop_bad_cop, logrolling, highball_lowball, fait_accompli, silence_flinch, reciprocal_concession, walkaway_threat) each with keyword patterns and confidence scoring
+    - **BATNA Assessment**: Buyer and supplier Best Alternative to Negotiated Agreement signal detection with strength classification (strong/moderate/weak/none)
+    - **Power Balance Analysis**: Dynamic buyer vs. supplier leverage estimation using BATNA strength, alternative mentions, urgency asymmetry, commitment asymmetry, and concession flow — normalized to 0–1 per party
+    - **ZOPA Estimation**: Zone of Possible Agreement from revealed price points, speaker-attributed (buyer ceiling vs. supplier floor), with overlap detection
+    - **Nash Equilibrium Approximation**: Leverage-adjusted ZOPA midpoint estimation with buyer/supplier utility scores and Pareto optimality assessment
+    - **Anchor Analysis**: First-mover detection, anchor price tracking, drift measurement, anchor effect scoring (0–1)
+    - **Concession Pattern Classification**: tit_for_tat, gradual, front_loaded, one_sided, or none — from temporal concession event tracking
+    - **Escalation/De-escalation Tracking**: Per-segment state (escalating, de_escalating, stable) from keyword signal balance
+    - **Bargaining Style Classification**: Integrative (expanding the pie) vs. distributive (splitting it) vs. mixed
+    - **Multi-Issue Linkage**: 7 issue categories (price, delivery, quality, contract_terms, compliance, sla, relationship) with per-segment detection
+    - **Deal Health Assessment**: converging, stalled, or diverging — from escalation trends and concession flow
+    - **Value-Creation Opportunity Identification**: Cross-issue trade suggestions (delivery↔volume, multi-year↔price, compliance↔term length, SLA↔pricing tiers)
+    - **Strategic Recommendations**: Actionable next-move generation based on ZOPA, Nash, power balance, open issues, concession pattern, and BATNA state
+  - **Procurement vertical integration**: `ProcurementPack.extract()` now calls `enrich_segment_negotiation_intel()` to add game theory fields to every segment
+  - **Schema expansion**: Added 7 new fields to procurement schema (negotiation_tactics, power_balance, batna_assessment, escalation_level, bargaining_style, issues_on_table, integrative_signals) — total now 26 fields
+  - **FieldType.JSON added**: New `JSON` type in `schemas/registry.py` for nested object fields (power_balance, batna_assessment)
+  - **E2E tests** (`tests/e2e/test_negotiation_intelligence.py`): **47 tests, ALL PASSING**
+    - Tactic detection (8): anchoring, time_pressure, walkaway, logrolling, good_cop_bad_cop, nibbling, no false positives, confidence scaling
+    - BATNA assessment (3): buyer strong, supplier detected, no BATNA neutral
+    - Power balance (4): buyer leverage, supplier leverage, balanced, driver population
+    - Escalation (3): escalating, de-escalating, stable
+    - Bargaining style (3): integrative, distributive, mixed
+    - Issue detection (2): price+delivery, contract+compliance
+    - Session analysis (12): report structure, ZOPA, Nash equilibrium, anchor analysis, concession trajectory, power shift timeline, deal health, issues tracking, value creation, recommendations, tactics summary, serialization
+    - Convenience functions (3): segment enrichment, empty transcript, session report
+    - ProcurementPack integration (4): field inclusion, power balance structure, schema fields, field count
+    - Edge cases (5): single segment, empty session, no prices, diverging negotiation, JSON serialization
+  - **Full suite**: 833 passed (up from 786), 16 pre-existing failures, 0 regressions
+- **Files Changed**: 
+  - New: `temporalos/intelligence/negotiation.py`, `tests/e2e/test_negotiation_intelligence.py`
+  - Modified: `temporalos/verticals/procurement.py`, `temporalos/schemas/registry.py`, `tests/e2e/test_procurement_vertical.py`
 
 ### TASK-028: Procurement Vertical — Jaggaer S2P Integration (33 tests)
 - **Status**: 🟢 Completed

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, Clock } from 'lucide-react'
+import { ChevronDown, ChevronUp, Clock, Swords, Scale, TrendingUp, AlertTriangle } from 'lucide-react'
 import { RiskBadge, Badge } from './Badge'
 import type { SegmentPair } from '../api/client'
 
@@ -87,6 +87,85 @@ export function SegmentCard({ pair }: { pair: SegmentPair }) {
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {/* Negotiation Intelligence — only renders if intel fields are present */}
+          {(extraction.negotiation_tactics?.length || extraction.power_balance || extraction.bargaining_style) && (
+            <div className="bg-violet-50/50 border border-violet-100 rounded-xl p-3 space-y-3">
+              <p className="text-xs font-bold text-violet-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Swords className="w-3.5 h-3.5" /> Negotiation Intel
+              </p>
+
+              {/* Tactics */}
+              {extraction.negotiation_tactics && extraction.negotiation_tactics.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {extraction.negotiation_tactics.map((t, i) => (
+                    <span key={i} className="text-[11px] bg-violet-100 text-violet-700 border border-violet-200 px-2 py-0.5 rounded-full font-medium capitalize">
+                      {t.replace(/_/g, ' ')}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* Power Balance */}
+                {extraction.power_balance && (
+                  <div className="flex items-center gap-2">
+                    <Scale className="w-3.5 h-3.5 text-slate-400" />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-[10px] text-slate-500">Power Balance</span>
+                        <span className="text-[10px] font-bold text-slate-600">{(extraction.power_balance.score * 100).toFixed(0)}%</span>
+                      </div>
+                      <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-violet-500 rounded-full transition-all"
+                          style={{ width: `${extraction.power_balance.score * 100}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-0.5 capitalize">{extraction.power_balance.advantage} advantage</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* BATNA Strength */}
+                {extraction.batna_assessment && (
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-3.5 h-3.5 text-slate-400" />
+                    <div className="flex-1">
+                      <p className="text-[10px] text-slate-500 mb-0.5">BATNA Strength</p>
+                      <div className="flex items-center gap-2 text-[10px]">
+                        <span className="text-blue-600 font-semibold">Buyer {(extraction.batna_assessment.buyer_strength * 100).toFixed(0)}%</span>
+                        <span className="text-slate-300">/</span>
+                        <span className="text-orange-600 font-semibold">Supplier {(extraction.batna_assessment.supplier_strength * 100).toFixed(0)}%</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom row: escalation + bargaining style */}
+              <div className="flex items-center gap-3 flex-wrap">
+                {extraction.escalation_level && (
+                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                    extraction.escalation_level === 'high' ? 'bg-red-100 text-red-700' :
+                    extraction.escalation_level === 'medium' ? 'bg-amber-100 text-amber-700' :
+                    'bg-slate-100 text-slate-600'
+                  }`}>
+                    <AlertTriangle className="w-3 h-3 inline mr-0.5 -mt-0.5" />
+                    {extraction.escalation_level} escalation
+                  </span>
+                )}
+                {extraction.bargaining_style && (
+                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 capitalize">
+                    {extraction.bargaining_style}
+                  </span>
+                )}
+                {extraction.issues_on_table && extraction.issues_on_table.length > 0 && (
+                  <span className="text-[10px] text-slate-400">{extraction.issues_on_table.length} issue{extraction.issues_on_table.length > 1 ? 's' : ''} on table</span>
+                )}
+              </div>
             </div>
           )}
 

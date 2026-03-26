@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "temporalos"
 version = "0.1.0"
-description = "Video → Structured Decision Intelligence Engine"
+description = "DealFrame — Video → Structured Negotiation Intelligence Engine"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.0",

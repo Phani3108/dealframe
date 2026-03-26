@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Settings, Bell, Shield, Palette, Monitor, Save, RefreshCw, Moon, Sun, User, Globe } from 'lucide-react'
+import { Settings, Bell, Shield, Palette, Monitor, Save, RefreshCw, Moon, Sun, User, Globe, Layers } from 'lucide-react'
+import { type ExperienceTier, getStoredTier, setStoredTier } from '../components/Layout'
 
 interface Prefs {
   theme: 'light' | 'dark' | 'system'
@@ -22,10 +23,11 @@ const defaultPrefs: Prefs = {
 export function SettingsPage() {
   const [prefs, setPrefs] = useState<Prefs>(defaultPrefs)
   const [saved, setSaved] = useState(false)
+  const [tier, setTier] = useState<ExperienceTier>(getStoredTier)
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('temporalos_prefs')
+      const stored = localStorage.getItem('dealframe_prefs')
       if (stored) setPrefs({ ...defaultPrefs, ...JSON.parse(stored) })
     } catch { /* ignore */ }
   }, [])
@@ -36,7 +38,7 @@ export function SettingsPage() {
   }
 
   const handleSave = () => {
-    localStorage.setItem('temporalos_prefs', JSON.stringify(prefs))
+    localStorage.setItem('dealframe_prefs', JSON.stringify(prefs))
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -77,7 +79,7 @@ export function SettingsPage() {
               <span className="text-xs font-semibold text-slate-300 uppercase tracking-widest">Preferences</span>
             </div>
             <h1 className="text-2xl font-bold text-white tracking-tight">Settings</h1>
-            <p className="text-slate-400 text-sm mt-1">Customize your TemporalOS experience</p>
+            <p className="text-slate-400 text-sm mt-1">Customize your DealFrame experience</p>
           </div>
           <button
             onClick={handleSave}
@@ -152,6 +154,29 @@ export function SettingsPage() {
               <option value="ja">日本語</option>
             </select>
           </div>
+        </Section>
+
+        {/* Experience Tier */}
+        <Section title="Experience Tier" icon={Layers}>
+          <p className="text-xs text-slate-400 -mt-2 mb-3">Control how many features appear in the sidebar. You can always change this later.</p>
+          {([
+            { value: 'essentials' as ExperienceTier, label: 'Essentials', desc: 'Dashboard, Upload, Search, Settings — clean and focused' },
+            { value: 'pro' as ExperienceTier, label: 'Pro', desc: 'Analytics, Coaching, Meeting Prep, Copilot, Batch, and more' },
+            { value: 'power' as ExperienceTier, label: 'Power', desc: 'Everything — Fine-tuning, Observability, Admin, Schema Builder, etc.' },
+          ]).map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => { setTier(opt.value); setStoredTier(opt.value) }}
+              className={`w-full text-left px-4 py-3 rounded-lg border transition ${
+                tier === opt.value
+                  ? 'border-indigo-300 bg-indigo-50 ring-1 ring-indigo-200'
+                  : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+              }`}
+            >
+              <p className={`text-sm font-semibold ${tier === opt.value ? 'text-indigo-700' : 'text-slate-700'}`}>{opt.label}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{opt.desc}</p>
+            </button>
+          ))}
         </Section>
       </div>
     </div>

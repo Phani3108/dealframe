@@ -10,6 +10,14 @@ export interface ExtractionResult {
   confidence: number
   model_name: string
   latency_ms: number
+  // Negotiation intelligence (optional — present when procurement vertical is active)
+  negotiation_tactics?: string[]
+  power_balance?: { score: number; advantage: string }
+  batna_assessment?: { buyer_strength: number; supplier_strength: number }
+  escalation_level?: string
+  bargaining_style?: string
+  issues_on_table?: string[]
+  integrative_signals?: string[]
 }
 
 export interface AlignedSegment {

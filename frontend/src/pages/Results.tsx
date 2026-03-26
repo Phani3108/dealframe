@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Clock, FileVideo, AlertTriangle, TrendingUp, Loader2 } from 'lucide-react'
+import { ArrowLeft, Clock, FileVideo, AlertTriangle, TrendingUp, Loader2, Swords, Scale, Target, ArrowRightLeft } from 'lucide-react'
 import { SegmentCard } from '../components/SegmentCard'
-import { getJob, getSpeakers, createSummary, listClips, extractSignificantClips, type Job } from '../api/client'
+import { getJob, getSpeakers, createSummary, listClips, extractSignificantClips, type Job, type SegmentPair } from '../api/client'
 
-type Tab = 'segments' | 'summary' | 'clips' | 'speakers'
+type Tab = 'segments' | 'summary' | 'clips' | 'speakers' | 'negotiation'
 const SUMMARY_TYPES = ['executive', 'action_items', 'meeting_notes', 'deal_brief']
 
 function RiskMeter({ score }: { score: number }) {
@@ -169,7 +169,7 @@ export function Results() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-slate-100 rounded-xl p-1 mb-6">
-        {(['segments', 'summary', 'clips', 'speakers'] as Tab[]).map(t => (
+        {(['segments', 'summary', 'clips', 'speakers', 'negotiation'] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => onTabChange(t)}
@@ -177,7 +177,7 @@ export function Results() {
               tab === t ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            {t.charAt(0).toUpperCase() + t.slice(1)}
+            {t === 'negotiation' ? 'Negotiation' : t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>
@@ -280,7 +280,7 @@ export function Results() {
               </div>
             )}
         </div>
-      ) : (
+      ) : tab === 'speakers' ? (
         /* Speakers tab */
         <div className="space-y-4">
           {speakersLoading
@@ -318,6 +318,196 @@ export function Results() {
                 </table>
               </div>
             )}
+        </div>
+      ) : (
+        /* Negotiation Report tab */
+        <NegotiationReport segments={segments} />
+      )}
+    </div>
+  )
+}
+
+/* ─── Negotiation Report Component ─────────────────────────────────────────── */
+
+function NegotiationReport({ segments }: { segments: SegmentPair[] }) {
+  // Aggregate negotiation intel across all segments
+  const report = useMemo(() => {
+    const allTactics: Record<string, number> = {}
+    let powerSum = 0, powerCount = 0
+    let buyerBatnaSum = 0, supplierBatnaSum = 0, batnaCount = 0
+    const escalationLevels: string[] = []
+    const styles: Record<string, number> = {}
+    const allIssues = new Set<string>()
+    let integrativeCount = 0
+
+    for (const { extraction } of segments) {
+      if (extraction.negotiation_tactics) {
+        for (const t of extraction.negotiation_tactics) {
+          allTactics[t] = (allTactics[t] || 0) + 1
+        }
+      }
+      if (extraction.power_balance) {
+        powerSum += extraction.power_balance.score
+        powerCount++
+      }
+      if (extraction.batna_assessment) {
+        buyerBatnaSum += extraction.batna_assessment.buyer_strength
+        supplierBatnaSum += extraction.batna_assessment.supplier_strength
+        batnaCount++
+      }
+      if (extraction.escalation_level) {
+        escalationLevels.push(extraction.escalation_level)
+      }
+      if (extraction.bargaining_style) {
+        styles[extraction.bargaining_style] = (styles[extraction.bargaining_style] || 0) + 1
+      }
+      if (extraction.issues_on_table) {
+        extraction.issues_on_table.forEach(i => allIssues.add(i))
+      }
+      if (extraction.integrative_signals?.length) {
+        integrativeCount += extraction.integrative_signals.length
+      }
+    }
+
+    const topTactics = Object.entries(allTactics)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+
+    const avgPower = powerCount > 0 ? powerSum / powerCount : null
+    const avgBuyerBatna = batnaCount > 0 ? buyerBatnaSum / batnaCount : null
+    const avgSupplierBatna = batnaCount > 0 ? supplierBatnaSum / batnaCount : null
+
+    const peakEscalation = escalationLevels.includes('high')
+      ? 'high' : escalationLevels.includes('medium')
+      ? 'medium' : escalationLevels.length > 0
+      ? 'low' : null
+
+    const dominantStyle = Object.entries(styles).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+
+    return { topTactics, avgPower, avgBuyerBatna, avgSupplierBatna, peakEscalation, dominantStyle, allIssues: [...allIssues], integrativeCount, hasData: Object.keys(allTactics).length > 0 || powerCount > 0 }
+  }, [segments])
+
+  if (!report.hasData) {
+    return (
+      <div className="card p-10 text-center">
+        <Swords className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+        <p className="text-slate-400 text-sm">No negotiation intelligence available for this session.</p>
+        <p className="text-xs text-slate-300 mt-1">Process a video with the Procurement vertical enabled to see intelligence here.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Top row: Power + BATNA + Escalation */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Power Balance */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <Scale className="w-4 h-4 text-violet-500" />
+            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Avg Power Balance</h3>
+          </div>
+          {report.avgPower !== null ? (
+            <>
+              <p className="text-3xl font-bold text-violet-600 tabular-nums">{(report.avgPower * 100).toFixed(0)}%</p>
+              <div className="h-2 bg-slate-100 rounded-full mt-2 overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-violet-400 to-violet-600 rounded-full" style={{ width: `${report.avgPower * 100}%` }} />
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">{report.avgPower > 0.55 ? 'Buyer advantage' : report.avgPower < 0.45 ? 'Supplier advantage' : 'Balanced'}</p>
+            </>
+          ) : <p className="text-sm text-slate-400">N/A</p>}
+        </div>
+
+        {/* BATNA */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <Target className="w-4 h-4 text-indigo-500" />
+            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">BATNA Strength</h3>
+          </div>
+          {report.avgBuyerBatna !== null && report.avgSupplierBatna !== null ? (
+            <div className="space-y-2">
+              <div>
+                <div className="flex justify-between text-[11px] mb-0.5">
+                  <span className="text-blue-600 font-semibold">Buyer</span>
+                  <span className="text-slate-500">{(report.avgBuyerBatna * 100).toFixed(0)}%</span>
+                </div>
+                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-400 rounded-full" style={{ width: `${report.avgBuyerBatna * 100}%` }} />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-[11px] mb-0.5">
+                  <span className="text-orange-600 font-semibold">Supplier</span>
+                  <span className="text-slate-500">{(report.avgSupplierBatna * 100).toFixed(0)}%</span>
+                </div>
+                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-orange-400 rounded-full" style={{ width: `${report.avgSupplierBatna * 100}%` }} />
+                </div>
+              </div>
+            </div>
+          ) : <p className="text-sm text-slate-400">N/A</p>}
+        </div>
+
+        {/* Escalation + Style */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <ArrowRightLeft className="w-4 h-4 text-amber-500" />
+            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Dynamics</h3>
+          </div>
+          <div className="space-y-2.5">
+            {report.peakEscalation && (
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-500">Peak Escalation</span>
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                  report.peakEscalation === 'high' ? 'bg-red-100 text-red-700' :
+                  report.peakEscalation === 'medium' ? 'bg-amber-100 text-amber-700' :
+                  'bg-slate-100 text-slate-600'
+                }`}>{report.peakEscalation}</span>
+              </div>
+            )}
+            {report.dominantStyle && (
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-500">Dominant Style</span>
+                <span className="text-[11px] font-bold text-indigo-600 capitalize">{report.dominantStyle}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-slate-500">Integrative Signals</span>
+              <span className="text-[11px] font-bold text-emerald-600">{report.integrativeCount}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tactics frequency */}
+      {report.topTactics.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <Swords className="w-4 h-4 text-violet-500" />
+            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Tactics Detected</h3>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {report.topTactics.map(([tactic, count]) => (
+              <div key={tactic} className="bg-violet-50 border border-violet-100 rounded-xl px-3 py-2.5">
+                <p className="text-sm font-semibold text-violet-700 capitalize">{tactic.replace(/_/g, ' ')}</p>
+                <p className="text-xs text-violet-400 mt-0.5">{count} occurrence{count > 1 ? 's' : ''}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Issues on the table */}
+      {report.allIssues.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+          <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Issues on the Table</h3>
+          <div className="flex flex-wrap gap-2">
+            {report.allIssues.map(issue => (
+              <span key={issue} className="text-xs bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-1 rounded-full capitalize">
+                {issue.replace(/_/g, ' ')}
+              </span>
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -182,7 +182,7 @@ export function Integrations() {
           <Plug className="w-6 h-6 text-indigo-500" />
           Integrations
         </h1>
-        <p className="text-slate-500 mt-1 text-sm">Connect TemporalOS to your existing stack.</p>
+        <p className="text-slate-500 mt-1 text-sm">Connect DealFrame to your existing stack.</p>
       </div>
 
       {/* Integration status */}
@@ -270,7 +270,7 @@ export function Integrations() {
           ⚡ Zapier REST Hooks
         </h2>
         <div className="bg-white rounded-2xl border border-slate-200 p-5">
-          <p className="text-sm text-slate-500 mb-4">Subscribe a Zapier hook URL to receive TemporalOS events.</p>
+          <p className="text-sm text-slate-500 mb-4">Subscribe a Zapier hook URL to receive DealFrame events.</p>
           <div className="flex gap-3">
             <input
               className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm"

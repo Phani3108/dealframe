@@ -1,4 +1,4 @@
-name: TemporalOS CI
+name: DealFrame CI
 
 on:
   push:

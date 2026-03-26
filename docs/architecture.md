@@ -1,8 +1,8 @@
-# TemporalOS Architecture
+# DealFrame Architecture
 
 ## System Overview
 
-TemporalOS is a **Video → Structured Decision Intelligence Engine**. It processes sales calls, demos, and walkthroughs into machine-consumable structured intelligence — segments with topics, sentiment, risk scores, objections, decision signals, and intent.
+DealFrame is a **Video → Structured Negotiation Intelligence Engine**. It processes sales calls, demos, and walkthroughs into machine-consumable structured intelligence — segments with topics, sentiment, risk scores, objections, decision signals, and intent.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐

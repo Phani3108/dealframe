@@ -1,5 +1,5 @@
-# TemporalOS — Expansion Vision
-> Last updated: 2026-03-21  
+# DealFrame — Expansion Vision
+> Last updated: 2026-03-26  
 > Status: Planning document — read before building
 
 ---
@@ -7,7 +7,7 @@
 ## The Core Claim (worth repeating)
 
 > **Any meeting, lecture, walkthrough, hearing, session, or call produces unstructured video.**  
-> TemporalOS turns video into a **machine-readable, queryable, actionable intelligence graph.**
+> DealFrame turns video into a **machine-readable, queryable, actionable intelligence graph.**
 
 That one capability is broadly useful across a dozen industries, three user scales, and dozens of integration targets. The plan below maps all of them, orders them by value and buildability, and defines five expansion phases.
 
@@ -215,7 +215,7 @@ Property walkthroughs, client consultation recordings, virtual tours.
 **Capabilities to build**:
 - Free tier: 3 videos/month
 - One-click export: PDF, Markdown, Notion page
-- Chrome extension — adds "Analyze in TemporalOS" button to Loom, Zoom cloud recording pages
+- Chrome extension — adds "Analyze in DealFrame" button to Loom, Zoom cloud recording pages
 - Obsidian plugin — sync analysis as notes
 - No-code Zapier integration (video URL → analysis → send to Google Sheet)
 - Dashboard shareable link (send analysis to client without account)
@@ -322,13 +322,13 @@ Property walkthroughs, client consultation recordings, virtual tours.
 
 | Framework | Integration | Priority |
 |-----------|------------|----------|
-| LangChain | `TemporalOSTool` — call TemporalOS from any chain | P0 |
-| LlamaIndex | `TemporalOSReader` — index video library as LlamaIndex documents | P0 |
+| LangChain | `DealFrameTool` — call DealFrame from any chain | P0 |
+| LlamaIndex | `DealFrameReader` — index video library as LlamaIndex documents | P0 |
 | AutoGPT | Plugin: process a video URL | P1 |
-| OpenAI Assistants | Function tool definition for TemporalOS API | P1 |
+| OpenAI Assistants | Function tool definition for DealFrame API | P1 |
 | Zapier | Zap: "Video uploaded → analyze → update CRM" | P0 |
 | Make.com | Module: process video + route output | P1 |
-| n8n | Node: TemporalOS analyze | P1 |
+| n8n | Node: DealFrame analyze | P1 |
 | Cursor / Windsurf | Extension: analyze screen recording of coding session | P2 |
 
 ### 3.6 Analytics & Observability
@@ -381,7 +381,7 @@ These are net-new capabilities beyond the current pipeline — each is a standal
 - "Which rep handles security objections best?"
 - "Summarize what we know about competitor X from our calls"
 
-**How to build**: embed all extraction results into vector store (Chroma/Pinecone) → LangChain RAG chain with TemporalOS retriever → answer with citations `[Call 2026-03-15 @ 12:32]`.
+**How to build**: embed all extraction results into vector store (Chroma/Pinecone) → LangChain RAG chain with DealFrame retriever → answer with citations `[Call 2026-03-15 @ 12:32]`.
 
 ### 4.5 Deal Risk Agent
 **What**: autonomous Slack bot that monitors your processed calls and alerts when a deal is at risk.
@@ -421,7 +421,7 @@ These are net-new capabilities beyond the current pipeline — each is a standal
 - Search past calls with this company
 - Generate: "Last call (2026-03-01): raised pricing objections, mentioned competitor X. Recommended talking points: ..."
 
-**How to build**: calendar webhook (Google/Outlook) → CRM lookup → TemporalOS search for past calls with same company → briefing prompt → deliver via email/Slack before the meeting.
+**How to build**: calendar webhook (Google/Outlook) → CRM lookup → DealFrame search for past calls with same company → briefing prompt → deliver via email/Slack before the meeting.
 
 ### 4.10 Batch Processing API
 **What**: enterprise-grade bulk video processing.
@@ -437,7 +437,7 @@ These are net-new capabilities beyond the current pipeline — each is a standal
 ## PART 5 — EXPANSION PHASES
 
 ### Phase A — Platform Primitives (Weeks 1–4)
-*Make TemporalOS a platform, not just a pipeline.*
+*Make DealFrame a platform, not just a pipeline.*
 
 **Deliverables**:
 
@@ -469,8 +469,8 @@ These are net-new capabilities beyond the current pipeline — each is a standal
 | B5 | **Salesforce enrichment** | OAuth → write custom Activity + fields on Contact/Opportunity |
 | B6 | **HubSpot enrichment** | OAuth → write Engagement + note |
 | B7 | **Zapier app** | Trigger: video processed. Action: push analysis to any Zapier-connected app |
-| B8 | **LangChain tool** | `TemporalOSTool` with full docstring for LLM function calling |
-| B9 | **LlamaIndex reader** | `TemporalOSReader` — turns video library into LlamaIndex index |
+| B8 | **LangChain tool** | `DealFrameTool` with full docstring for LLM function calling |
+| B9 | **LlamaIndex reader** | `DealFrameReader` — turns video library into LlamaIndex index |
 
 ---
 
@@ -608,7 +608,7 @@ Current threading approach hits limits at ~10 concurrent videos. Celery with Red
 
 ## PART 9 — COMPETITIVE LANDSCAPE
 
-| Product | Focus | Weakness vs TemporalOS |
+| Product | Focus | Weakness vs DealFrame |
 |---------|-------|----------------------|
 | Gong.io | Sales call intelligence | $1,200+/seat/year, closed, no custom schemas, no fine-tuning |
 | Chorus.ai (ZoomInfo) | Sales call intelligence | Same as Gong, acquisition baggage |
@@ -618,13 +618,13 @@ Current threading approach hits limits at ~10 concurrent videos. Celery with Red
 | Grain | Sales highlights | Clip extraction only, no intelligence |
 | Recall.ai | Recording infrastructure | Infrastructure only, no intelligence layer |
 
-**TemporalOS moat**: open-source core, fine-tunable models, custom schemas, multimodal (vision + audio), developer-first API, self-hostable.
+**DealFrame moat**: open-source core, fine-tunable models, custom schemas, multimodal (vision + audio), developer-first API, self-hostable.
 
 ---
 
 ## Summary
 
-TemporalOS is 10% built. The core pipeline works. What's missing:
+DealFrame is 10% built. The core pipeline works. What's missing:
 
 1. **The outputs people share** (summaries, clips, Notion pages) – Phase A
 2. **The integrations people live in** (Zoom, Slack, Salesforce) – Phase B  
@@ -632,4 +632,4 @@ TemporalOS is 10% built. The core pipeline works. What's missing:
 4. **The verticals that pay** (legal, healthcare, finance) – Phase D
 5. **The infrastructure that enterprises need** (SSO, HIPAA, multi-tenant) – Phase E
 
-The first 10 items above can be built in 4–6 weeks and will transform TemporalOS from a demo project into a product people want to pay for.
+The first 10 items above can be built in 4–6 weeks and will transform DealFrame from a demo project into a product people want to pay for.

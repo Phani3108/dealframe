@@ -1,4 +1,4 @@
-# TemporalOS — Default Configuration
+# DealFrame — Default Configuration
 # All values here are defaults. Override via environment variables:
 #   AUDIO__WHISPER_MODEL=base
 #   VIDEO__FRAME_INTERVAL_SECONDS=3

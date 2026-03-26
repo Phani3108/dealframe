@@ -1,7 +1,7 @@
-# TemporalOS — Project Rules & Context
+# DealFrame (formerly TemporalOS) — Project Rules & Context
 
 ## Project Overview
-**TemporalOS** is a Video → Structured Decision Intelligence Engine.
+**DealFrame** is a Video → Structured Negotiation Intelligence Engine.
 It converts video (sales calls, demos, walkthroughs) into machine-consumable structured intelligence — extracting segments with topics, sentiment, risk scores, objections, decision signals, and intent.
 
 ## Core Learning Goals
