@@ -1,0 +1,12 @@
+# nixpacks build configuration (Railway, Render, etc.)
+# Explicitly declares the start command so the FastAPI entrypoint scanner
+# is bypassed — no need to detect `app = FastAPI(...)` in any file.
+
+[phases.setup]
+aptPkgs = ["ffmpeg"]
+
+[phases.install]
+cmds = ["pip install -e ."]
+
+[start]
+cmd = "uvicorn temporalos.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"

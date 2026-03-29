@@ -62,10 +62,9 @@ dev = [
 ]
 
 [project.scripts]
-# Deployment entrypoint — platforms resolve this to find the ASGI app object.
-# e.g. `app` → temporalos.api.main:app
-app = "temporalos.api.main:app"
-dealframe = "temporalos.api.main:app"
+# `dealframe` starts the uvicorn server — used by Railway/nixpacks as the
+# `app` script and exposed as a CLI command after `pip install`.
+dealframe = "temporalos.cli:start"
 
 [tool.hatch.build.targets.wheel]
 packages = ["temporalos"]
