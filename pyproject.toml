@@ -62,8 +62,9 @@ dev = [
 ]
 
 [project.scripts]
-# `dealframe` starts the uvicorn server — used by Railway/nixpacks as the
-# `app` script and exposed as a CLI command after `pip install`.
+# `app` key is checked by Vercel, Railway/nixpacks, and other platforms.
+# Points to a real callable (start function) not a FastAPI instance.
+app = "temporalos.cli:start"
 dealframe = "temporalos.cli:start"
 
 [tool.hatch.build.targets.wheel]
