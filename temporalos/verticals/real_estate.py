@@ -37,7 +37,7 @@ class RealEstatePack(VerticalPack):
                   "Property Management", "Mortgage Brokerage"]
     summary_type = "real_estate_consult"
 
-    def extract(self, segment_data: Dict) -> Dict:
+    def _vertical_extract(self, segment_data: Dict) -> Dict:
         text = " ".join([
             segment_data.get("topic", ""),
             " ".join(segment_data.get("objections", [])),

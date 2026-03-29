@@ -25,7 +25,7 @@ class UXResearchPack(VerticalPack):
                   "Healthcare UX", "Fintech", "EdTech"]
     summary_type = "ux_research"
 
-    def extract(self, segment_data: Dict) -> Dict:
+    def _vertical_extract(self, segment_data: Dict) -> Dict:
         text = " ".join([
             segment_data.get("topic", ""),
             " ".join(segment_data.get("objections", [])),

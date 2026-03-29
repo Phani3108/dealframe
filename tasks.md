@@ -19,6 +19,33 @@
 
 ## Active Tasks
 
+### TASK-031: Core Loop Fix — YouTube Ingestion + Negotiation Intel for All Verticals
+- **Status**: 🟢 Completed
+- **Date**: 2026-03-29
+- **Prompt/Trigger**: User audit: YouTube video links added earlier have no stats extracted; dashboard shows all zeros; earlier stubs not fixed; project direction review.
+- **Work Done**:
+  - **Project audit**: Identified that YouTube ingestion was completely absent (no yt-dlp, no URL handler). Dashboard zeros explained — empty DB, not a bug. Identified 5 unfixed stubs.
+  - **YouTube/URL ingestion** (`temporalos/ingestion/url_downloader.py`, NEW): Async `download_video()` using yt-dlp. Supports YouTube, Vimeo, Loom, and any yt-dlp compatible platform. Returns local mp4 path. `is_supported_url()` helper for validation.
+  - **Process endpoint** (`temporalos/api/routes/process.py`): `POST /process` now accepts either `file` (multipart upload) OR `video_url` (form field). Download path uses `download_video()` synchronously before pipeline runs. Returns `source_url` in response.
+  - **yt-dlp dependency** (`pyproject.toml`): Added `yt-dlp>=2024.1.0` to core dependencies.
+  - **Negotiation intel for ALL verticals** (`temporalos/verticals/base.py`): `VerticalPack.extract()` now auto-calls `enrich_segment_negotiation_intel()` after each vertical's own logic. Subclasses renamed from `extract()` to `_vertical_extract()` (Sales, CustomerSuccess, RealEstate, UXResearch, Procurement). Opt-out via `enrich_with_negotiation_intel = False`. Removed duplicate call from `ProcurementPack`.
+  - **Search re-indexing fix** (`temporalos/api/routes/search.py`): `POST /search/index/{video_id}` now loads `SearchDocRecord` rows from DB and re-indexes into the in-memory TF-IDF engine. Returns segment count.
+  - **KG persistence** (`temporalos/agents/knowledge_graph.py`, `temporalos/api/routes/agents.py`): `POST /agents/kg/index/{job_id}` now persists nodes/edges to `KGNodeRecord`/`KGEdgeRecord` DB tables after indexing. `get_knowledge_graph()` warm-starts from DB on first access after server restart.
+- **Files Changed**:
+  - `temporalos/ingestion/url_downloader.py` (NEW)
+  - `temporalos/api/routes/process.py`
+  - `temporalos/api/routes/search.py`
+  - `temporalos/api/routes/agents.py`
+  - `temporalos/agents/knowledge_graph.py`
+  - `temporalos/verticals/base.py`
+  - `temporalos/verticals/sales.py`
+  - `temporalos/verticals/customer_success.py`
+  - `temporalos/verticals/real_estate.py`
+  - `temporalos/verticals/ux_research.py`
+  - `temporalos/verticals/procurement.py`
+  - `pyproject.toml`
+- **Notes**: Dashboard will populate once at least one video is processed end-to-end with API keys configured. YouTube URLs can now be submitted via `video_url` form field.
+
 ### TASK-030: DealFrame Rename + Progressive Disclosure UX
 - **Status**: 🟢 Completed
 - **Date**: 2026-03-26

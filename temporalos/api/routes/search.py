@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+import asyncio
+
+from fastapi import APIRouter, HTTPException, Query
 
 from ...intelligence.portfolio_insights import PortfolioInsights
 from ...search.indexer import get_search_index
@@ -40,9 +42,54 @@ async def index_stats() -> dict:
 
 @router.post("/index/{video_id}")
 async def index_video(video_id: str) -> dict:
-    """Trigger re-indexing of a specific video's extractions."""
-    # In production: load extractions from DB and call _engine.index_extraction()
-    return {"message": f"Indexing queued for video {video_id}", "video_id": video_id}
+    """Re-index all extractions for a specific video from the database."""
+    try:
+        from ...db.session import get_session_factory
+        from ...db.models import SearchDocRecord
+        from sqlalchemy import select
+        from ...search.indexer import IndexEntry, get_search_index
+
+        sf = get_session_factory()
+        if not sf:
+            raise HTTPException(status_code=503, detail="Database not available")
+
+        async with sf() as sess:
+            rows = (await sess.execute(
+                select(SearchDocRecord).where(SearchDocRecord.video_id == video_id)
+            )).scalars().all()
+
+        if not rows:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No indexed segments found for video '{video_id}'",
+            )
+
+        idx = get_search_index()
+        for row in rows:
+            entry = IndexEntry(
+                doc_id=row.id,
+                video_id=row.video_id,
+                timestamp_ms=row.timestamp_ms or 0,
+                timestamp_str="",
+                topic=row.topic or "",
+                risk=row.risk or "",
+                risk_score=row.risk_score or 0.0,
+                objections=row.objections or [],
+                decision_signals=row.decision_signals or [],
+                transcript=row.transcript or "",
+                model=row.model or "",
+            )
+            idx.index(entry)
+
+        return {
+            "message": f"Re-indexed {len(rows)} segments for video {video_id}",
+            "video_id": video_id,
+            "segments_indexed": len(rows),
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.get("/insights/patterns")

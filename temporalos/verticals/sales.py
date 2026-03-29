@@ -33,7 +33,7 @@ class SalesPack(VerticalPack):
                   "Financial Services", "Recruiting"]
     summary_type = "deal_brief"
 
-    def extract(self, segment_data: Dict) -> Dict:
+    def _vertical_extract(self, segment_data: Dict) -> Dict:
         """Enrich extraction with sales-specific fields."""
         text = " ".join([
             segment_data.get("topic", ""),

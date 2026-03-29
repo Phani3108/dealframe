@@ -24,7 +24,7 @@ class CustomerSuccessPack(VerticalPack):
                   "Healthcare SaaS", "EdTech", "HR Tech"]
     summary_type = "cs_qbr"
 
-    def extract(self, segment_data: Dict) -> Dict:
+    def _vertical_extract(self, segment_data: Dict) -> Dict:
         text = " ".join([
             segment_data.get("topic", ""),
             " ".join(segment_data.get("objections", [])),

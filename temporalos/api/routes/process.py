@@ -13,13 +13,14 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
 
 from ...alignment.aligner import align
 from ...audio.whisper import transcribe
 from ...config import get_settings
 from ...extraction.models.gpt4o import GPT4oExtractionModel
 from ...ingestion.extractor import extract_frames, get_video_duration_ms
+from ...ingestion.url_downloader import download_video, is_supported_url
 from ...observability.telemetry import get_tracer
 
 logger = logging.getLogger(__name__)
@@ -221,51 +222,80 @@ def _run_pipeline(job_id: str, video_path: str, frames_dir: str) -> None:
 @router.post("/process", status_code=202)
 async def process_video(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
+    video_url: Optional[str] = Form(None),
 ) -> dict:
-    """Submit a video file for processing."""
+    """Submit a video for processing.
+
+    Accepts either:
+    - ``file``: a multipart video file upload, OR
+    - ``video_url``: a URL to a YouTube video or any yt-dlp supported source.
+
+    Exactly one of the two must be provided.
+    """
     settings = get_settings()
-    suffix = Path(file.filename or "").suffix.lower().lstrip(".")
-
-    if suffix not in settings.video.supported_formats:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Unsupported format '{suffix}'. "
-                f"Supported: {settings.video.supported_formats}"
-            ),
-        )
-
     job_id = str(uuid.uuid4())
     upload_dir = Path(settings.app.upload_dir)
     frames_dir = str(Path(settings.app.frames_dir) / job_id)
     upload_dir.mkdir(parents=True, exist_ok=True)
-    video_path = str(upload_dir / f"{job_id}.{suffix}")
 
-    with open(video_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+    if video_url:
+        # ── URL ingestion path (YouTube, Vimeo, Loom, etc.)
+        if not is_supported_url(video_url):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported URL scheme. Must start with http:// or https://",
+            )
+        try:
+            video_path = download_video(video_url, upload_dir)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        except ImportError as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
 
-    # Persist to configured storage backend (local/S3)
-    try:
-        from ...storage import get_storage
-        storage = get_storage()
-        with open(video_path, "rb") as vf:
-            video_bytes = vf.read()
-        asyncio.ensure_future(
-            storage.put(f"uploads/{job_id}.{suffix}", video_bytes))
-    except Exception:
-        pass  # Storage backend optional — local copy always exists
+    elif file is not None:
+        # ── File upload path
+        suffix = Path(file.filename or "").suffix.lower().lstrip(".")
+        if suffix not in settings.video.supported_formats:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Unsupported format '{suffix}'. "
+                    f"Supported: {settings.video.supported_formats}"
+                ),
+            )
+        video_path = str(upload_dir / f"{job_id}.{suffix}")
+        with open(video_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+
+        # Persist to configured storage backend (local/S3)
+        try:
+            from ...storage import get_storage
+            storage = get_storage()
+            with open(video_path, "rb") as vf:
+                video_bytes = vf.read()
+            asyncio.ensure_future(
+                storage.put(f"uploads/{job_id}.mp4", video_bytes))
+        except Exception:
+            pass  # Storage backend optional — local copy always exists
+
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide either 'file' (upload) or 'video_url' (YouTube/URL).",
+        )
 
     _jobs[job_id] = {
         "status": "pending",
         "stages_done": [],
         "video_path": video_path,
         "frames_dir": frames_dir,
+        "source_url": video_url or "",
     }
     await _db_save_job(job_id, _jobs[job_id])
     background_tasks.add_task(_run_pipeline, job_id, video_path, frames_dir)
 
-    return {"job_id": job_id, "status": "pending"}
+    return {"job_id": job_id, "status": "pending", "source_url": video_url or ""}
 
 
 @router.get("/jobs/{job_id}")

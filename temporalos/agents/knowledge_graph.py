@@ -246,8 +246,52 @@ class KnowledgeGraph:
 _graph: Optional[KnowledgeGraph] = None
 
 
+async def _restore_from_db(kg: KnowledgeGraph) -> None:
+    """Populate the in-memory graph from persisted DB records."""
+    try:
+        from temporalos.db.session import get_session_factory
+        from temporalos.db.models import KGNodeRecord, KGEdgeRecord
+        from sqlalchemy import select
+
+        sf = get_session_factory()
+        if not sf:
+            return
+        async with sf() as sess:
+            nodes = (await sess.execute(select(KGNodeRecord))).scalars().all()
+            edges = (await sess.execute(select(KGEdgeRecord))).scalars().all()
+
+        for row in nodes:
+            node = KGNode(
+                id=row.node_id,
+                entity_type=row.entity_type,
+                label=row.label,
+                frequency=row.frequency,
+                jobs=set(row.jobs or []),
+            )
+            kg._nodes[row.node_id] = node
+
+        for row in edges:
+            key = (min(row.source, row.target), max(row.source, row.target))
+            kg._edges[key] = KGEdge(source=row.source, target=row.target, weight=row.weight)
+
+        if nodes:
+            logger.info("Restored KG from DB: %d nodes, %d edges", len(nodes), len(edges))
+    except Exception as exc:
+        logger.debug("KG DB restore skipped: %s", exc)
+
+
 def get_knowledge_graph() -> KnowledgeGraph:
     global _graph
     if _graph is None:
         _graph = KnowledgeGraph()
+        # Best-effort warm start from DB (fire-and-forget)
+        try:
+            import asyncio
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.ensure_future(_restore_from_db(_graph))
+            else:
+                loop.run_until_complete(_restore_from_db(_graph))
+        except Exception:
+            pass
     return _graph

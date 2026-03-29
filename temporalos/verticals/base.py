@@ -1,10 +1,13 @@
 """Base class for vertical packs."""
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
 from temporalos.schemas.registry import FieldDefinition, FieldType, SchemaDefinition
+
+logger = logging.getLogger(__name__)
 
 
 class VerticalPack(ABC):
@@ -16,20 +19,41 @@ class VerticalPack(ABC):
     description: str = ""
     industries: List[str] = []
     summary_type: str = "meeting_notes"
+    # Set to False in a subclass to opt out of automatic negotiation enrichment.
+    enrich_with_negotiation_intel: bool = True
 
     @abstractmethod
     def schema(self) -> SchemaDefinition:
         """Return the SchemaDefinition for this vertical."""
         ...
 
-    def extract(self, segment_data: Dict) -> Dict:
-        """Apply vertical-specific extraction logic to a segment.
+    def _vertical_extract(self, segment_data: Dict) -> Dict:
+        """Override in subclasses to add vertical-specific fields.
 
-        Takes extraction data dict and enriches it with vertical-specific
-        fields. Default implementation uses rule-based keyword matching.
-        Override in subclasses for vertical-specific logic.
+        The default implementation is a no-op (returns the dict unchanged).
+        Do NOT call super() in subclasses — the base class calls this via
+        :meth:`extract` and then applies shared enrichments afterward.
         """
         return segment_data
+
+    def extract(self, segment_data: Dict) -> Dict:
+        """Apply vertical-specific extraction then shared enrichments.
+
+        Subclasses should override :meth:`_vertical_extract`, not this method.
+        This ensures the negotiation intelligence layer runs for every vertical.
+        """
+        # 1. Vertical-specific logic
+        enriched = self._vertical_extract(segment_data)
+
+        # 2. Negotiation intelligence (shared across all verticals)
+        if self.enrich_with_negotiation_intel:
+            try:
+                from temporalos.intelligence.negotiation import enrich_segment_negotiation_intel
+                enriched = enrich_segment_negotiation_intel(enriched)
+            except Exception as exc:
+                logger.debug("Negotiation enrichment skipped: %s", exc)
+
+        return enriched
 
     def to_dict(self) -> dict:
         schema_dict = self.schema().to_dict()

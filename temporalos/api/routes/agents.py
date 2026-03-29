@@ -147,9 +147,44 @@ async def index_job_in_kg(job_id: str) -> dict:
     job = jobs.get(job_id)
     if not job:
         raise HTTPException(404, f"Job '{job_id}' not found")
-    intel = job.get("intelligence", {})
+    intel = job.get("intelligence", job.get("result", {}))
     kg = get_knowledge_graph()
     count = kg.add_video(job_id, intel)
+
+    # Persist nodes and edges to database
+    try:
+        from ...db.session import get_session_factory
+        from ...db.models import KGNodeRecord, KGEdgeRecord
+        from sqlalchemy import select
+        sf = get_session_factory()
+        if sf:
+            async with sf() as sess:
+                for node in kg._nodes.values():
+                    row = (await sess.execute(
+                        select(KGNodeRecord).where(KGNodeRecord.node_id == node.id)
+                    )).scalar_one_or_none()
+                    if row is None:
+                        row = KGNodeRecord(node_id=node.id,
+                                           entity_type=node.entity_type,
+                                           label=node.label)
+                        sess.add(row)
+                    row.frequency = node.frequency
+                    row.jobs = sorted(node.jobs)
+                for edge in kg._edges.values():
+                    edge_row = (await sess.execute(
+                        select(KGEdgeRecord).where(
+                            KGEdgeRecord.source == edge.source,
+                            KGEdgeRecord.target == edge.target,
+                        )
+                    )).scalar_one_or_none()
+                    if edge_row is None:
+                        edge_row = KGEdgeRecord(source=edge.source, target=edge.target)
+                        sess.add(edge_row)
+                    edge_row.weight = edge.weight
+                await sess.commit()
+    except Exception as exc:
+        logger.warning("KG persistence failed: %s", exc)
+
     return {"job_id": job_id, "entities_indexed": count, "stats": kg.stats}
 
 

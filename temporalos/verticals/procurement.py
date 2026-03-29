@@ -9,7 +9,6 @@ from __future__ import annotations
 import re
 from typing import Dict, List
 
-from temporalos.intelligence.negotiation import enrich_segment_negotiation_intel
 from temporalos.schemas.registry import FieldDefinition, FieldType, SchemaDefinition
 from temporalos.verticals.base import VerticalPack
 
@@ -123,7 +122,7 @@ class ProcurementPack(VerticalPack):
     ]
     summary_type = "negotiation_brief"
 
-    def extract(self, segment_data: Dict) -> Dict:
+    def _vertical_extract(self, segment_data: Dict) -> Dict:
         """Enrich extraction with procurement-specific fields."""
         text = " ".join([
             segment_data.get("topic", ""),
@@ -193,9 +192,6 @@ class ProcurementPack(VerticalPack):
         # --- Maverick spend risk ---
         maverick = any(kw in text for kw in _MAVERICK_KEYWORDS)
         segment_data["maverick_spend_risk"] = maverick
-
-        # --- Negotiation Intelligence (Game Theory layer) ---
-        enrich_segment_negotiation_intel(segment_data)
 
         return segment_data
 
