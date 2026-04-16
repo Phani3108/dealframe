@@ -50,6 +50,18 @@ class StorageBackend(ABC):
         """List keys with the given prefix."""
         ...
 
+    async def presign_put(self, key: str, expires_in: int = 3600, content_type: Optional[str] = None) -> dict:
+        """Return a presigned PUT upload URL (if supported).
+
+        Backends that cannot generate presigned URLs should return a fallback
+        descriptor instructing clients to use the regular upload endpoint.
+        """
+        raise NotImplementedError
+
+    async def presign_get(self, key: str, expires_in: int = 3600) -> str:
+        """Return a presigned GET download URL."""
+        raise NotImplementedError
+
 
 class LocalStorage(StorageBackend):
     """Local filesystem storage backend."""
@@ -87,6 +99,24 @@ class LocalStorage(StorageBackend):
 
     async def exists(self, key: str) -> bool:
         return self._path(key).exists()
+
+    async def presign_put(self, key: str, expires_in: int = 3600, content_type: Optional[str] = None) -> dict:
+        # Local backend has no presigning; instruct the client to fall back to the
+        # regular multipart upload endpoint. Keeps the API surface consistent.
+        return {
+            "mode": "fallback",
+            "method": "POST",
+            "upload_url": "/api/v1/uploads/direct",
+            "fields": {"key": key},
+            "key": key,
+            "reason": "local storage backend — use POST upload",
+        }
+
+    async def presign_get(self, key: str, expires_in: int = 3600) -> str:
+        p = self._path(key)
+        if not p.exists():
+            raise FileNotFoundError(f"Key not found: {key}")
+        return f"file://{p}"
 
     async def list_keys(self, prefix: str = "") -> list[str]:
         base = self._path(prefix) if prefix else self._base
@@ -172,6 +202,44 @@ class S3Storage(StorageBackend):
             return True
         except Exception:
             return False
+
+    async def presign_put(self, key: str, expires_in: int = 3600, content_type: Optional[str] = None) -> dict:
+        import asyncio
+        loop = asyncio.get_event_loop()
+
+        def _presign() -> dict:
+            params: dict = {"Bucket": self._bucket, "Key": key}
+            if content_type:
+                params["ContentType"] = content_type
+            url = self._client.generate_presigned_url(
+                "put_object",
+                Params=params,
+                ExpiresIn=expires_in,
+            )
+            return {
+                "mode": "s3",
+                "method": "PUT",
+                "upload_url": url,
+                "key": key,
+                "expires_in": expires_in,
+                "content_type": content_type,
+                "bucket": self._bucket,
+            }
+
+        return await loop.run_in_executor(None, _presign)
+
+    async def presign_get(self, key: str, expires_in: int = 3600) -> str:
+        import asyncio
+        loop = asyncio.get_event_loop()
+
+        def _gen() -> str:
+            return self._client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": self._bucket, "Key": key},
+                ExpiresIn=expires_in,
+            )
+
+        return await loop.run_in_executor(None, _gen)
 
     async def list_keys(self, prefix: str = "") -> list[str]:
         import asyncio

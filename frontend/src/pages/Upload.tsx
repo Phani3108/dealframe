@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Upload as UploadIcon, FileVideo, CheckCircle2, XCircle, Loader2, X, Clapperboard, Zap, Cloud, Link2, Globe } from 'lucide-react'
 import { processVideo, processVideoUrl, processLocally, getJob, getLocalJob, listSchemas } from '../api/client'
+import { JobProgress } from '../components/JobProgress'
 
 type Mode = 'api' | 'local'
 type InputMode = 'file' | 'url'
@@ -106,24 +107,16 @@ export function Upload() {
       setJobId(id)
       setStageStatus(0, 'done')
 
-      // Animate through stages while polling
-      let stageIdx = 1
+      // For API pipeline + URL uploads the durable worker will emit SSE events
+      // that the JobProgress card renders in real time. We still poll the job
+      // record so we know when to mark "done" for the CTA button.
       const poll = mode === 'local' && inputMode === 'file'
         ? () => getLocalJob(id)
         : () => getJob(id)
 
-      setStageStatus(stageIdx, 'active')
       while (true) {
-        await new Promise(r => setTimeout(r, 1800))
+        await new Promise(r => setTimeout(r, 1500))
         const j = await poll()
-
-        // Advance visual stage
-        if (stageIdx < stageNames.length - 1) {
-          setStageStatus(stageIdx, 'done')
-          stageIdx++
-          setStageStatus(stageIdx, 'active')
-        }
-
         if (j.status === 'completed') {
           setStages(stageNames.map(name => ({ name, status: 'done' })))
           setRunStatus('done')
@@ -371,8 +364,29 @@ export function Upload() {
         </>
       )}
 
-      {/* Progress tracker */}
-      {runStatus !== 'idle' && (
+      {/* Live SSE progress (API pipeline / URL mode only) */}
+      {runStatus !== 'idle' && jobId && !(mode === 'local' && inputMode === 'file') && (
+        <div className="mt-6">
+          <JobProgress jobId={jobId} onComplete={() => setRunStatus('done')} />
+          {runStatus === 'done' && jobId && (
+            <button
+              onClick={() => navigate(`/results/${jobId}`)}
+              className="mt-4 w-full btn-primary py-3 text-base font-bold"
+            >
+              View Results
+            </button>
+          )}
+          {runStatus === 'error' && errorMsg && (
+            <div className="mt-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2">
+              <XCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-red-700">{errorMsg}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Legacy fallback for local pipeline (no SSE events) */}
+      {runStatus !== 'idle' && (!jobId || (mode === 'local' && inputMode === 'file')) && (
         <div className="mt-6 border border-slate-200 rounded-2xl p-6 bg-white shadow-sm">
           <p className="text-sm font-bold text-slate-800 mb-5">Pipeline progress</p>
           <div className="space-y-4">

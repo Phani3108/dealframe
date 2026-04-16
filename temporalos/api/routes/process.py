@@ -305,7 +305,18 @@ async def process_video(
         "source_url": video_url or "",
     }
     await _db_save_job(job_id, _jobs[job_id])
-    background_tasks.add_task(_run_pipeline, job_id, video_path, frames_dir)
+
+    # Prefer the durable DB-backed queue (survives restarts, emits SSE events).
+    # Falls back to an in-process background task if the DB is unavailable.
+    try:
+        from ...batch.durable_queue import enqueue_job
+        await enqueue_job(
+            job_id, video_path, frames_dir,
+            meta={"source_url": video_url or ""},
+        )
+    except Exception as exc:  # pragma: no cover — degraded mode
+        logger.warning("durable enqueue failed, falling back to in-thread run: %s", exc)
+        background_tasks.add_task(_run_pipeline, job_id, video_path, frames_dir)
 
     return {"job_id": job_id, "status": "pending", "source_url": video_url or ""}
 

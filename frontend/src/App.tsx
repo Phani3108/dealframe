@@ -26,6 +26,12 @@ import { PatternMiner } from './pages/PatternMiner'
 import { LiveCopilot } from './pages/LiveCopilot'
 import { Admin } from './pages/Admin'
 import { SettingsPage } from './pages/SettingsPage'
+import { DealInbox } from './pages/DealInbox'
+import { SharedDeal } from './pages/SharedDeal'
+import { Flywheel } from './pages/Flywheel'
+import { DealCompare } from './pages/DealCompare'
+import { Verticals } from './pages/Verticals'
+import { CommandPalette } from './components/CommandPalette'
 
 // Lazy-load Recharts-heavy Intelligence page to avoid headless/SSR crashes
 const Intelligence = lazy(() => import('./pages/Intelligence').then(m => ({ default: m.Intelligence })))
@@ -34,6 +40,7 @@ const Intelligence = lazy(() => import('./pages/Intelligence').then(m => ({ defa
 function AppShell() {
   return (
     <Layout>
+      <CommandPalette />
       <Outlet />
     </Layout>
   )
@@ -46,10 +53,17 @@ export default function App() {
         {/* Landing page — full-screen, no sidebar */}
         <Route path="/" element={<LandingPage />} />
 
+        {/* Public shared deal — no sidebar, no auth */}
+        <Route path="/shared/:token" element={<SharedDeal />} />
+
         {/* App pages — wrapped in sidebar layout */}
         <Route element={<AppShell />}>
           <Route path="/home" element={<LandingPage />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/deals" element={<DealInbox />} />
+          <Route path="/flywheel" element={<Flywheel />} />
+          <Route path="/compare" element={<DealCompare />} />
+          <Route path="/verticals" element={<Verticals />} />
           <Route path="/upload" element={<Upload />} />
           <Route path="/results/:jobId" element={<Results />} />
           <Route path="/observatory" element={<Observatory />} />

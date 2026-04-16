@@ -36,6 +36,10 @@ class AlignedSegment:
     timestamp_ms: int
     frame: Frame | None
     words: list[Word]
+    # Optional OCR text extracted from the frame by the VisionPipeline.
+    # When present, extraction models should include it as additional context.
+    ocr_text: str = ""
+    frame_type: str = ""
 
     @property
     def timestamp_str(self) -> str:

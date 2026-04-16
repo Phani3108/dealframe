@@ -1,6 +1,6 @@
 """FastAPI application entry point."""
 # © 2024-2026 Phani Marupaka. All rights reserved.
-# TemporalOS — Video → Structured Decision Intelligence Engine
+# DealFrame — Video → Structured Negotiation Intelligence Engine
 # Author: Phani Marupaka <https://linkedin.com/in/phani-marupaka>
 
 from contextlib import asynccontextmanager
@@ -38,6 +38,14 @@ from .routes import (
     diff as diff_routes,
     patterns as pattern_routes,
 )
+from .routes import chat as chat_routes
+from .routes import progress as progress_routes
+from .routes import flywheel as flywheel_routes
+from .routes import share as share_routes
+from .routes import deals as deals_routes
+from .routes import live_copilot as live_copilot_routes
+from .routes import verticals as verticals_routes
+from .routes import uploads as uploads_routes
 
 _FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
 
@@ -99,6 +107,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as exc:
         _log.warning("Service init skipped: %s", exc)
 
+    # ── Durable DB-backed job worker (in-process, no Redis) ────────────────
+    _worker_started = False
+    try:
+        from ..batch.durable_queue import start_worker
+        start_worker()
+        _worker_started = True
+        _log.info("Durable job worker started")
+    except Exception as exc:
+        _log.warning("Durable worker skipped: %s", exc)
+
     # ── Auto-seed demo data if database is empty ────────────────────────────
     try:
         from .routes.process import _jobs
@@ -141,6 +159,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.warning("Agent seed from cache skipped: %s", exc)
 
     yield
+
+    # ── Shutdown ───────────────────────────────────────────────────────────
+    if _worker_started:
+        try:
+            from ..batch.durable_queue import stop_worker
+            await stop_worker()
+        except Exception:  # pragma: no cover
+            pass
 
 
 async def _rebuild_search_index_from_db(session_factory) -> None:
@@ -194,7 +220,7 @@ _COPYRIGHT = "(c) 2024-2026 Phani Marupaka. All rights reserved."
 class _AttributionMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         response = await call_next(request)
-        response.headers["X-Powered-By"] = "TemporalOS"
+        response.headers["X-Powered-By"] = "DealFrame"
         response.headers["X-Author"] = _AUTHOR
         response.headers["X-Copyright"] = _COPYRIGHT
         # Security headers
@@ -215,7 +241,41 @@ class _AttributionMiddleware(BaseHTTPMiddleware):
         )
         return response
 
+class _TenantGuardMiddleware(BaseHTTPMiddleware):
+    """Enforces tenant presence on /api/v1/* when DEALFRAME_REQUIRE_TENANT=1.
+
+    Keeps the /share/view/* and /ws/* paths open so public share links and
+    WebSocket streams continue to work. Unauthenticated requests get 401.
+    """
+
+    _SKIP_PREFIXES = ("/api/v1/share/view", "/api/v1/deals", "/api/v1/metrics", "/api/v1/health")
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        import os as _os
+        from fastapi.responses import JSONResponse
+
+        path = request.url.path
+        enforce = _os.environ.get("DEALFRAME_REQUIRE_TENANT", "").lower() in {"1", "true", "yes"}
+        if enforce and path.startswith("/api/v1/") and not any(path.startswith(p) for p in self._SKIP_PREFIXES):
+            tenant_id = request.headers.get("x-tenant-id") or request.headers.get("X-Tenant-ID")
+            if not tenant_id:
+                try:
+                    from ..enterprise.multi_tenant import get_tenant
+                    ctx = get_tenant()
+                    tenant_id = ctx.tenant_id if ctx is not None else None
+                except Exception:
+                    tenant_id = None
+            if not tenant_id:
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "tenant required — supply X-Tenant-ID header"},
+                )
+            request.state.tenant_id = tenant_id
+        return await call_next(request)
+
+
 app.add_middleware(_AttributionMiddleware)
+app.add_middleware(_TenantGuardMiddleware)
 
 app.include_router(process.router, prefix="/api/v1")
 app.include_router(observatory.router, prefix="/api/v1")
@@ -248,6 +308,20 @@ app.include_router(pattern_routes.router, prefix="/api/v1")
 app.include_router(copilot_routes.router, prefix="/api/v1")
 app.include_router(admin_routes.router, prefix="/api/v1")
 app.include_router(seed_routes.router, prefix="/api/v1")
+
+# Wave 1 — Chat-with-Deal, SSE progress
+app.include_router(chat_routes.router, prefix="/api/v1")
+app.include_router(progress_routes.router, prefix="/api/v1")
+
+# Wave 2 — Fine-tuning flywheel, Deal inbox, Export/Share
+app.include_router(flywheel_routes.router, prefix="/api/v1")
+app.include_router(share_routes.router, prefix="/api/v1")
+app.include_router(deals_routes.router, prefix="/api/v1")
+
+# Wave 3 — Live negotiation copilot (WebSocket mic + cue cards)
+app.include_router(live_copilot_routes.router)
+app.include_router(verticals_routes.router, prefix="/api/v1")
+app.include_router(uploads_routes.router, prefix="/api/v1")
 
 
 # ── Seed endpoint ──────────────────────────────────────────────────────────

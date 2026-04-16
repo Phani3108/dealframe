@@ -1,8 +1,15 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Clock, FileVideo, AlertTriangle, TrendingUp, Loader2, Swords, Scale, Target, ArrowRightLeft } from 'lucide-react'
+import { ArrowLeft, Clock, FileVideo, AlertTriangle, TrendingUp, Loader2, Swords, Scale, Target, ArrowRightLeft, Share2, FileDown, MessageSquare, Film } from 'lucide-react'
 import { SegmentCard } from '../components/SegmentCard'
-import { getJob, getSpeakers, createSummary, listClips, extractSignificantClips, type Job, type SegmentPair } from '../api/client'
+import { DealTimeline } from '../components/DealTimeline'
+import { DealChat } from '../components/DealChat'
+import { CorrectionDialog } from '../components/CorrectionDialog'
+import {
+  getJob, getSpeakers, createSummary, listClips, extractSignificantClips,
+  createShareLink, downloadDealBrief,
+  type Job, type SegmentPair,
+} from '../api/client'
 
 type Tab = 'segments' | 'summary' | 'clips' | 'speakers' | 'negotiation'
 const SUMMARY_TYPES = ['executive', 'action_items', 'meeting_notes', 'deal_brief']
@@ -28,6 +35,11 @@ export function Results() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tab, setTab] = useState<Tab>('segments')
+  const [currentMs, setCurrentMs] = useState(0)
+  const [showChat, setShowChat] = useState(true)
+  const [correctTarget, setCorrectTarget] = useState<SegmentPair | null>(null)
+  const [shareUrl, setShareUrl] = useState<string | null>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   // Summary
   const [summaryType, setSummaryType] = useState('executive')
@@ -127,8 +139,36 @@ export function Results() {
   const segments = intel?.segments ?? []
   const highRiskCount = segments.filter(p => p.extraction.risk === 'high').length
 
+  const seek = (ts: string | number) => {
+    const ms = typeof ts === 'number'
+      ? ts
+      : (() => {
+          const parts = ts.split(':').map(n => parseInt(n, 10))
+          if (parts.length === 3) return (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000
+          if (parts.length === 2) return (parts[0] * 60 + parts[1]) * 1000
+          return 0
+        })()
+    setCurrentMs(ms)
+    const v = videoRef.current
+    if (v) {
+      try { v.currentTime = Math.max(0, ms / 1000); v.play().catch(() => {}) } catch { /* ignore */ }
+    }
+  }
+
+  const handleShare = async () => {
+    if (!jobId) return
+    try {
+      const r = await createShareLink(jobId, 168)
+      setShareUrl(r.link.url)
+      try { await navigator.clipboard.writeText(r.link.url) } catch { /* ignore */ }
+    } catch { /* ignore */ }
+  }
+
+  const videoSrc = (job as Job & { video_path?: string; source_url?: string }).source_url
+    || (jobId ? `/api/v1/stream/video/${jobId}` : undefined)
+
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl animate-fade-in">
+    <div className="p-4 sm:p-6 lg:p-8 animate-fade-in">
       {/* Back */}
       <Link to="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-6 group">
         <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
@@ -136,7 +176,7 @@ export function Results() {
       </Link>
 
       {/* Header card */}
-      <div className="card p-6 mb-6">
+      <div className="card p-6 mb-4">
         <div className="flex items-start justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -153,11 +193,35 @@ export function Results() {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200"
+              title="Create a shareable read-only link"
+            >
+              <Share2 className="w-3.5 h-3.5" /> Share
+            </button>
+            <a
+              href={jobId ? downloadDealBrief(jobId) : '#'}
+              target="_blank" rel="noreferrer"
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200"
+              title="Download a printable deal brief"
+            >
+              <FileDown className="w-3.5 h-3.5" /> Brief
+            </a>
+            <button
+              onClick={() => setShowChat(v => !v)}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl ${
+                showChat ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+              title="Toggle chat panel"
+            >
+              <MessageSquare className="w-3.5 h-3.5" /> Chat
+            </button>
             {highRiskCount > 0 && (
               <div className="text-right">
-                <p className="text-xs text-slate-500">High risk segments</p>
-                <p className="text-3xl font-bold text-red-600 tabular-nums">{highRiskCount}</p>
+                <p className="text-xs text-slate-500">High risk</p>
+                <p className="text-2xl font-bold text-red-600 tabular-nums">{highRiskCount}</p>
               </div>
             )}
             {intel?.overall_risk_score != null && (
@@ -165,7 +229,50 @@ export function Results() {
             )}
           </div>
         </div>
+        {shareUrl && (
+          <p className="mt-3 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 font-mono break-all">
+            Share link copied: {shareUrl}
+          </p>
+        )}
       </div>
+
+      {/* Cinematic timeline + video player row */}
+      {job.status === 'completed' && segments.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+          <div className="lg:col-span-2 space-y-3">
+            <div className="relative rounded-2xl overflow-hidden bg-black border border-white/5">
+              {videoSrc ? (
+                <video
+                  ref={videoRef}
+                  src={videoSrc}
+                  controls
+                  className="w-full aspect-video"
+                  onTimeUpdate={(e) => setCurrentMs(Math.round(e.currentTarget.currentTime * 1000))}
+                />
+              ) : (
+                <div className="w-full aspect-video flex items-center justify-center text-slate-500 text-sm">
+                  <Film className="w-8 h-8 mr-2" />
+                  Video preview unavailable
+                </div>
+              )}
+            </div>
+            <DealTimeline
+              segments={segments}
+              durationMs={(intel?.duration_ms as number | undefined) ?? undefined}
+              onSeek={(ms) => seek(ms)}
+              activeTimestampMs={currentMs}
+            />
+          </div>
+          {showChat && jobId && (
+            <div className="lg:col-span-1 h-[520px]">
+              <DealChat
+                jobId={jobId}
+                onCitationClick={(ts) => seek(ts)}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 bg-slate-100 rounded-xl p-1 mb-6">
@@ -212,7 +319,28 @@ export function Results() {
             </div>
             <div className="space-y-3">
               {segments.map((pair, i) => (
-                <SegmentCard key={i} pair={pair} />
+                <div key={i} className="group relative">
+                  <SegmentCard pair={pair} />
+                  <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                    <button
+                      onClick={() => {
+                        const ts = (pair.segment as unknown as { timestamp_str?: string }).timestamp_str
+                          || (pair as unknown as { timestamp?: string }).timestamp
+                        if (ts) seek(ts)
+                      }}
+                      className="text-[10px] font-medium px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200"
+                    >
+                      Seek
+                    </button>
+                    <button
+                      onClick={() => setCorrectTarget(pair)}
+                      className="text-[10px] font-medium px-2 py-1 rounded-md bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200"
+                      title="Correct this extraction (feeds the training flywheel)"
+                    >
+                      Correct
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
           </>
@@ -322,6 +450,15 @@ export function Results() {
       ) : (
         /* Negotiation Report tab */
         <NegotiationReport segments={segments} />
+      )}
+
+      {correctTarget && jobId && (
+        <CorrectionDialog
+          jobId={jobId}
+          pair={correctTarget}
+          segmentIndex={segments.indexOf(correctTarget)}
+          onClose={() => setCorrectTarget(null)}
+        />
       )}
     </div>
   )

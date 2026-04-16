@@ -2,7 +2,7 @@
 LoRA fine-tuning trainer — Phase 4.
 
 Wraps HuggingFace PEFT + Transformers to fine-tune a causal LM
-(default: Mistral-7B-Instruct) on the TemporalOS extraction dataset.
+(default: Mistral-7B-Instruct) on the DealFrame extraction dataset.
 
 All heavy dependencies (torch, transformers, peft, datasets) are imported
 lazily so the module can be imported on any machine without GPU / HF packages.

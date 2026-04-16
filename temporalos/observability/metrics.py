@@ -1,4 +1,4 @@
-"""Prometheus metrics registry for TemporalOS pipeline telemetry."""
+"""Prometheus metrics registry for DealFrame pipeline telemetry."""
 
 from __future__ import annotations
 

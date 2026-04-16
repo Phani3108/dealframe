@@ -359,3 +359,112 @@ class SearchDocRecord(Base):
     transcript: Mapped[str] = mapped_column(Text, default="")
     model: Mapped[str] = mapped_column(String(100), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+# ── Wave 1: Chat-with-Deal ─────────────────────────────────────────────────────
+
+class Conversation(Base):
+    """Per-deal persistent chat thread."""
+    __tablename__ = "conversations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)  # UUID
+    job_id: Mapped[str] = mapped_column(String(255), index=True)
+    user_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    tenant_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    title: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    messages: Mapped[list["ChatMessage"]] = relationship(
+        "ChatMessage", back_populates="conversation", cascade="all, delete-orphan"
+    )
+
+
+class ChatMessage(Base):
+    """A single message in a conversation. Citations reference timestamps in the video."""
+    __tablename__ = "chat_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    conversation_id: Mapped[str] = mapped_column(
+        ForeignKey("conversations.id"), index=True
+    )
+    role: Mapped[str] = mapped_column(String(20))  # user | assistant | system
+    content: Mapped[str] = mapped_column(Text)
+    citations: Mapped[list] = mapped_column(JSON, default=list)
+    model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    conversation: Mapped["Conversation"] = relationship(
+        "Conversation", back_populates="messages"
+    )
+
+
+# ── Wave 1: Durable Job Queue (extends JobRecord above) ────────────────────────
+
+class JobEvent(Base):
+    """Append-only job progress events for observability and SSE replay."""
+    __tablename__ = "job_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    job_id: Mapped[str] = mapped_column(String(36), index=True)
+    stage: Mapped[str] = mapped_column(String(100))  # enqueued|ingest|transcribe|align|extract|done|failed
+    status: Mapped[str] = mapped_column(String(50), default="info")  # info|progress|done|error
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+# ── Wave 2: Fine-tuning Flywheel (extraction corrections) ──────────────────────
+
+class ExtractionCorrection(Base):
+    """User correction of an extraction — feeds the nightly LoRA trainer."""
+    __tablename__ = "extraction_corrections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    job_id: Mapped[str] = mapped_column(String(255), index=True)
+    segment_index: Mapped[int] = mapped_column(Integer)
+    timestamp_str: Mapped[str] = mapped_column(String(20), default="")
+    transcript: Mapped[str] = mapped_column(Text, default="")
+    original_extraction: Mapped[dict] = mapped_column(JSON, default=dict)
+    corrected_extraction: Mapped[dict] = mapped_column(JSON, default=dict)
+    user_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    tenant_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    used_for_training: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class AdapterRecord(Base):
+    """A LoRA adapter trained from corrections, with eval metrics and promote state."""
+    __tablename__ = "adapters"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)  # UUID
+    tenant_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), default="")
+    path: Mapped[str] = mapped_column(String(1024), default="")
+    training_examples: Mapped[int] = mapped_column(Integer, default=0)
+    baseline_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    candidate_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    delta: Mapped[float | None] = mapped_column(Float, nullable=True)
+    promoted: Mapped[bool] = mapped_column(Boolean, default=False)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+# ── Wave 2: Shared Deal Links ──────────────────────────────────────────────────
+
+class ShareLink(Base):
+    """Scoped, signed share link for read-only deal views."""
+    __tablename__ = "share_links"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)  # opaque token
+    job_id: Mapped[str] = mapped_column(String(255), index=True)
+    tenant_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    created_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    scope: Mapped[str] = mapped_column(String(50), default="readonly")
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+    view_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

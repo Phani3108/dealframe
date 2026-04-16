@@ -74,9 +74,21 @@ Timestamp: {timestamp}
 Transcript:
 {transcript}
 
-Extract structured intelligence matching this JSON schema:
+{ocr_block}Extract structured intelligence matching this JSON schema:
 {schema}
 """
+
+
+def _format_ocr_block(ocr_text: str, frame_type: str) -> str:
+    """Render the on-screen text block for the LLM prompt when available."""
+    ocr_text = (ocr_text or "").strip()
+    if not ocr_text:
+        return ""
+    ft = f" ({frame_type})" if frame_type else ""
+    return (
+        f"On-screen text{ft} (from slide/screen OCR — use as evidence when it disambiguates the transcript):\n"
+        f"{ocr_text}\n\n"
+    )
 
 
 # ── Adapter ────────────────────────────────────────────────────────────────────
@@ -168,6 +180,10 @@ class GPT4oExtractionModel(BaseExtractionModel):
                 "text": _USER_TEMPLATE.format(
                     timestamp=segment.timestamp_str,
                     transcript=segment.transcript or "(no speech in this segment)",
+                    ocr_block=_format_ocr_block(
+                        getattr(segment, "ocr_text", ""),
+                        getattr(segment, "frame_type", ""),
+                    ),
                     schema=json.dumps(_EXTRACTION_SCHEMA, indent=2),
                 ),
             }

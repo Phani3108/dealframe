@@ -24,13 +24,24 @@ that are clearly stated or strongly implied.
 Respond ONLY with valid JSON — no prose, no markdown fences.\
 """
 
+def _format_claude_ocr_block(ocr_text: str, frame_type: str) -> str:
+    ocr_text = (ocr_text or "").strip()
+    if not ocr_text:
+        return ""
+    ft = f" ({frame_type})" if frame_type else ""
+    return (
+        f"On-screen text{ft} (from slide/screen OCR — use as evidence when it disambiguates the transcript):\n"
+        f"{ocr_text}\n\n"
+    )
+
+
 _USER_TEMPLATE = """\
 Timestamp: {timestamp}
 
 Transcript:
 {transcript}
 
-Extract structured intelligence as JSON with these fields:
+{ocr_block}Extract structured intelligence as JSON with these fields:
 - topic: pricing | features | competition | timeline | security | onboarding | support | legal | other
 - sentiment: positive | neutral | negative | hesitant
 - risk: low | medium | high
@@ -133,6 +144,10 @@ class ClaudeExtractionModel(BaseExtractionModel):
             "text": _USER_TEMPLATE.format(
                 timestamp=segment.timestamp_str,
                 transcript=segment.transcript or "(no speech in this segment)",
+                ocr_block=_format_claude_ocr_block(
+                    getattr(segment, "ocr_text", ""),
+                    getattr(segment, "frame_type", ""),
+                ),
             ),
         })
         return content

@@ -73,7 +73,7 @@ Upload a video → get back topics, sentiment, risk scores, objections, decision
 
 ## Industry Verticals
 
-TemporalOS ships with domain-specific extraction packs — each adds targeted keyword detection, schema fields, and enrichment logic on top of the core pipeline:
+DealFrame ships with domain-specific extraction packs — each adds targeted keyword detection, schema fields, and enrichment logic on top of the core pipeline:
 
 | Vertical | What It Extracts | Target Industries |
 |---|---|---|

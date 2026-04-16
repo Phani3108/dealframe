@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { Bot, Send, Zap, RefreshCw, Radio, AlertTriangle, Sparkles } from 'lucide-react'
+import { Bot, Send, Zap, RefreshCw, Radio, AlertTriangle, Sparkles, Mic, FileText } from 'lucide-react'
 import { analyzeLive, getCopilotConfig } from '../api/client'
+import { LiveMic } from '../components/LiveMic'
 
 interface Signal {
   type: string
@@ -14,6 +15,7 @@ export function LiveCopilot() {
   const [signals, setSignals] = useState<Signal[]>([])
   const [config, setConfig] = useState<{ signal_types: string[]; enabled: boolean; refresh_interval_ms: number } | null>(null)
   const [loading, setLoading] = useState(false)
+  const [mode, setMode] = useState<'mic' | 'paste'>('mic')
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -67,16 +69,40 @@ export function LiveCopilot() {
             <h1 className="text-2xl font-bold text-white tracking-tight">Live Copilot</h1>
             <p className="text-blue-200 text-sm mt-1">AI coaching signals as the conversation unfolds</p>
           </div>
-          {config && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-lg text-xs text-blue-200">
-              <Radio className="w-3.5 h-3.5" />
-              {config.enabled ? 'Active' : 'Disabled'} · {config.signal_types.length} signals
+          <div className="flex items-center gap-3">
+            <div className="flex bg-white/10 rounded-lg p-0.5 gap-0.5">
+              <button
+                onClick={() => setMode('mic')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition ${
+                  mode === 'mic' ? 'bg-white text-blue-700' : 'text-blue-100 hover:text-white'
+                }`}
+              >
+                <Mic className="w-3.5 h-3.5" /> Live mic
+              </button>
+              <button
+                onClick={() => setMode('paste')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition ${
+                  mode === 'paste' ? 'bg-white text-blue-700' : 'text-blue-100 hover:text-white'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" /> Paste text
+              </button>
             </div>
-          )}
+            {config && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-lg text-xs text-blue-200">
+                <Radio className="w-3.5 h-3.5" />
+                {config.enabled ? 'Active' : 'Disabled'} · {config.signal_types.length} signals
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Main content: 2-panel */}
+      {mode === 'mic' ? (
+        <div className="flex-1 min-h-0">
+          <LiveMic />
+        </div>
+      ) : (
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
         {/* Left: Transcript input */}
         <div className="flex flex-col bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -140,6 +166,7 @@ export function LiveCopilot() {
           </div>
         </div>
       </div>
+      )}
     </div>
   )
 }

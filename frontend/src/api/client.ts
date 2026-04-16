@@ -609,17 +609,45 @@ export interface AuditEntry {
   ip_address: string
 }
 
-export const queryAudit = (params?: { action?: string; resource_type?: string; limit?: number; offset?: number }) => {
-  const p = new URLSearchParams()
-  if (params?.action) p.set('action', params.action)
-  if (params?.resource_type) p.set('resource_type', params.resource_type)
-  if (params?.limit) p.set('limit', String(params.limit))
-  if (params?.offset) p.set('offset', String(params.offset))
-  return request<{ entries: AuditEntry[]; total: number }>(`/audit?${p}`)
+export interface AuditQueryParams {
+  action?: string
+  resource_type?: string
+  user_id?: string
+  tenant_id?: string
+  since?: number
+  until?: number
+  q?: string
+  limit?: number
+  offset?: number
 }
+
+const _auditSearchParams = (params: AuditQueryParams = {}) => {
+  const p = new URLSearchParams()
+  if (params.action) p.set('action', params.action)
+  if (params.resource_type) p.set('resource_type', params.resource_type)
+  if (params.user_id) p.set('user_id', params.user_id)
+  if (params.tenant_id) p.set('tenant_id', params.tenant_id)
+  if (params.since !== undefined) p.set('since', String(params.since))
+  if (params.until !== undefined) p.set('until', String(params.until))
+  if (params.q) p.set('q', params.q)
+  if (params.limit) p.set('limit', String(params.limit))
+  if (params.offset !== undefined) p.set('offset', String(params.offset))
+  return p
+}
+
+export const queryAudit = (params: AuditQueryParams = {}) =>
+  request<{ entries: AuditEntry[]; total: number; total_unfiltered: number; limit: number; offset: number }>(
+    `/audit?${_auditSearchParams(params)}`,
+  )
 
 export const getAuditStats = () =>
   request<{ total_entries: number; action_counts: Record<string, number>; resource_counts: Record<string, number> }>('/audit/stats')
+
+export function auditExportUrl(params: AuditQueryParams & { fmt?: 'csv' | 'json' } = {}): string {
+  const p = _auditSearchParams(params)
+  if (params.fmt) p.set('fmt', params.fmt)
+  return `${BASE}/audit/export?${p}`
+}
 
 // ─── Diff Engine (Phase J) ──────────────────────────────────────────────────
 
@@ -677,3 +705,363 @@ export const markNotificationRead = (notifId: string, userId = 'default') =>
 
 export const markAllNotificationsRead = (userId = 'default') =>
   request<{ marked_read: number }>(`/notifications/read-all?user_id=${userId}`, { method: 'POST' })
+
+// ─── SSE helper ──────────────────────────────────────────────────────────────
+// Uses `fetch` with ReadableStream so we can send auth headers (EventSource can't)
+// and so we can POST instead of only GET.
+
+export type SSEHandler = (event: string, data: Record<string, unknown>) => void
+
+export interface SSESubscription {
+  close: () => void
+  done: Promise<void>
+}
+
+export function subscribeSSE(
+  path: string,
+  onEvent: SSEHandler,
+  init?: RequestInit,
+): SSESubscription {
+  const controller = new AbortController()
+  const done = (async () => {
+    try {
+      const res = await fetch(`${BASE}${path}`, { ...init, signal: controller.signal })
+      if (!res.ok || !res.body) throw new Error(`SSE ${res.status}`)
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      while (true) {
+        const { value, done: end } = await reader.read()
+        if (end) break
+        buffer += decoder.decode(value, { stream: true })
+        let idx = buffer.indexOf('\n\n')
+        while (idx !== -1) {
+          const chunk = buffer.slice(0, idx).trim()
+          buffer = buffer.slice(idx + 2)
+          if (chunk && !chunk.startsWith(':')) {
+            let eventName = 'message'
+            const dataLines: string[] = []
+            for (const line of chunk.split('\n')) {
+              if (line.startsWith('event:')) eventName = line.slice(6).trim()
+              else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim())
+            }
+            if (dataLines.length) {
+              try { onEvent(eventName, JSON.parse(dataLines.join('\n'))) }
+              catch { onEvent(eventName, { raw: dataLines.join('\n') }) }
+            }
+          }
+          idx = buffer.indexOf('\n\n')
+        }
+      }
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') throw e
+    }
+  })()
+  return { close: () => controller.abort(), done }
+}
+
+// ─── Chat-with-Deal ──────────────────────────────────────────────────────────
+
+export interface ChatCitation {
+  segment_index: number
+  timestamp: string
+  topic: string
+  risk_score: number
+}
+
+export interface ChatMessage {
+  id: number
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  citations: ChatCitation[]
+  model?: string
+  latency_ms?: number
+  created_at: string
+}
+
+export interface ChatAnswer {
+  conversation_id: string
+  question: string
+  answer: string
+  citations: ChatCitation[]
+  model: string
+  latency_ms: number
+}
+
+export const askDeal = (
+  jobId: string,
+  question: string,
+  conversationId?: string,
+) =>
+  request<ChatAnswer>(`/chat/${jobId}/ask`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, conversation_id: conversationId }),
+  })
+
+export const streamDealChat = (
+  jobId: string,
+  question: string,
+  onEvent: SSEHandler,
+  conversationId?: string,
+): SSESubscription => {
+  const params = new URLSearchParams({ q: question })
+  if (conversationId) params.set('conversation_id', conversationId)
+  return subscribeSSE(`/chat/${jobId}/stream?${params}`, onEvent)
+}
+
+export const listDealConversations = (jobId: string) =>
+  request<{ conversations: Array<{ id: string; title: string; job_id: string; created_at: string; updated_at: string }> }>(
+    `/chat/${jobId}/conversations`,
+  )
+
+export const getConversationMessages = (conversationId: string) =>
+  request<{ messages: ChatMessage[] }>(`/chat/conversation/${conversationId}/messages`)
+
+// ─── Realtime job progress (Wave 1) ──────────────────────────────────────────
+
+export interface JobProgressEvent {
+  job_id?: string
+  stage: string
+  status: string
+  detail: Record<string, unknown>
+  created_at?: string
+}
+
+export const streamJobProgress = (
+  jobId: string,
+  onEvent: (event: string, data: JobProgressEvent) => void,
+): SSESubscription =>
+  subscribeSSE(`/progress/jobs/${jobId}/stream`, (event, data) => {
+    onEvent(event, data as unknown as JobProgressEvent)
+  })
+
+export const getJobEvents = (jobId: string) =>
+  request<{ events: JobProgressEvent[] }>(`/progress/jobs/${jobId}/events`)
+
+// ─── Deal Inbox (Wave 2) ─────────────────────────────────────────────────────
+
+export interface DealRow {
+  job_id: string
+  title: string
+  status: string
+  created_at?: string
+  duration_ms?: number
+  overall_risk_score: number
+  segment_count: number
+  high_risk_count: number
+  top_topic?: string
+  top_objection?: string
+  stage?: string
+}
+
+export const listDeals = (limit = 200) =>
+  request<{ deals: DealRow[] }>(`/deals?limit=${limit}`)
+
+export const getDealSummary = () =>
+  request<{ total: number; completed: number; processing: number; failed: number; avg_risk: number; total_segments: number; high_risk_deals: number }>(
+    '/deals/summary',
+  )
+
+// ─── Fine-tuning Flywheel (Wave 2) ───────────────────────────────────────────
+
+export interface ExtractionCorrection {
+  id: number
+  job_id: string
+  segment_index: number
+  timestamp_str: string
+  transcript: string
+  original_extraction: Record<string, unknown>
+  corrected_extraction: Record<string, unknown>
+  notes: string
+  used_for_training: boolean
+  created_at: string
+}
+
+export const submitCorrection = (payload: {
+  job_id: string
+  segment_index: number
+  timestamp_str: string
+  transcript: string
+  original: Record<string, unknown>
+  corrected: Record<string, unknown>
+  notes?: string
+  user_id?: string
+}) =>
+  request<{ correction: ExtractionCorrection }>('/flywheel/corrections', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+
+export const listCorrections = (jobId?: string, limit = 100) => {
+  const p = new URLSearchParams({ limit: String(limit) })
+  if (jobId) p.set('job_id', jobId)
+  return request<{ corrections: ExtractionCorrection[]; total: number }>(`/flywheel/corrections?${p}`)
+}
+
+export interface Adapter {
+  id: string
+  name: string
+  path: string
+  training_examples: number
+  baseline_score?: number
+  candidate_score?: number
+  delta?: number
+  promoted: boolean
+  notes: string
+  created_at: string
+}
+
+export const listAdapters = () =>
+  request<{ adapters: Adapter[] }>('/flywheel/adapters')
+
+export const trainAdapter = (name?: string, dryRun = false) =>
+  request<{ adapter: Adapter }>('/flywheel/train', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, dry_run: dryRun }),
+  })
+
+export const promoteAdapter = (adapterId: string) =>
+  request<{ adapter: Adapter }>(`/flywheel/adapters/${adapterId}/promote`, { method: 'POST' })
+
+export const rollbackAdapter = (adapterId: string) =>
+  request<{ adapter: Adapter }>(`/flywheel/adapters/${adapterId}/rollback`, { method: 'POST' })
+
+export const getFlywheelStatus = () =>
+  request<{ corrections_total: number; corrections_unused: number; adapters_total: number; active_adapter?: Adapter }>('/flywheel/status')
+
+// ─── Export & Share (Wave 2) ─────────────────────────────────────────────────
+
+export interface SharedLink {
+  id: string
+  job_id: string
+  url: string
+  scope: string
+  expires_at?: string
+  revoked: boolean
+  view_count: number
+  created_at: string
+}
+
+export const createShareLink = (jobId: string, ttlHours?: number) =>
+  request<{ link: SharedLink }>('/share', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ job_id: jobId, ttl_hours: ttlHours }),
+  })
+
+export const listShareLinks = (jobId?: string) => {
+  const p = new URLSearchParams()
+  if (jobId) p.set('job_id', jobId)
+  return request<{ links: SharedLink[] }>(`/share?${p}`)
+}
+
+export const revokeShareLink = (linkId: string) =>
+  request<{ revoked: boolean }>(`/share/${linkId}`, { method: 'DELETE' })
+
+export const getSharedDeal = (token: string) =>
+  request<{ job_id: string; title: string; result: Record<string, unknown>; expires_at?: string }>(`/share/view/${token}`)
+
+export const downloadDealBrief = (jobId: string): string =>
+  `${BASE}/export/brief/${jobId}`
+
+// ─── Vertical Packs v2 (Wave 3) ──────────────────────────────────────────────
+
+export interface VerticalPackSummary {
+  id: string
+  name: string
+  description: string
+  industries: string[]
+  summary_type: string
+  field_count: number
+  fields: Array<{ name: string; type: string; description?: string; options?: string[]; required?: boolean }>
+  prompt_hint?: string
+}
+
+export const listVerticalPacks = () =>
+  request<{ packs: VerticalPackSummary[]; total: number }>('/verticals')
+
+export const getVerticalPack = (packId: string) =>
+  request<VerticalPackSummary>(`/verticals/${packId}`)
+
+export interface VerticalDashboard {
+  pack_id: string
+  deal_count: number
+  total_segments?: number
+  avg_risk: number
+  high_risk_rate: number
+  top_topics: Array<[string, number]>
+  top_objections: Array<[string, number]>
+  pack_field_hits?: Array<[string, number]>
+  pack_fields: string[]
+  prompt_hint?: string
+}
+
+export const getVerticalDashboard = (packId: string, limit = 200) =>
+  request<VerticalDashboard>(`/verticals/${packId}/dashboard?limit=${limit}`)
+
+// ─── Presigned uploads (Wave 4) ──────────────────────────────────────────────
+
+export interface PresignResponse {
+  mode: 's3' | 'fallback'
+  method: 'PUT' | 'POST'
+  upload_url: string
+  key: string
+  content_type?: string
+  expires_in?: number
+  original_filename?: string
+  reason?: string
+  fields?: Record<string, string>
+}
+
+export const requestPresignedUpload = (payload: { filename: string; content_type?: string; size?: number }) =>
+  request<PresignResponse>('/uploads/presign', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+
+export const commitPresignedUpload = (payload: { key: string; filename?: string; use_vision?: boolean }) =>
+  request<{ job_id: string; key: string; queued: boolean; local_path: string }>('/uploads/commit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+
+/**
+ * Upload a large file directly to the storage backend via a presigned URL.
+ * Falls back to the regular /process multipart upload when the backend is not
+ * S3-compatible. Returns the final job_id on success.
+ */
+export async function uploadLargeVideo(
+  file: File,
+  opts: { useVision?: boolean; onProgress?: (pct: number) => void } = {},
+): Promise<{ job_id: string; mode: string }> {
+  const presign = await requestPresignedUpload({
+    filename: file.name,
+    content_type: file.type || 'application/octet-stream',
+    size: file.size,
+  })
+
+  if (presign.mode === 's3') {
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('PUT', presign.upload_url)
+      if (presign.content_type) xhr.setRequestHeader('Content-Type', presign.content_type)
+      xhr.upload.onprogress = e => {
+        if (e.lengthComputable && opts.onProgress) opts.onProgress(e.loaded / e.total)
+      }
+      xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed: ${xhr.status}`)))
+      xhr.onerror = () => reject(new Error('Upload network error'))
+      xhr.send(file)
+    })
+    const commit = await commitPresignedUpload({ key: presign.key, filename: file.name, use_vision: opts.useVision })
+    return { job_id: commit.job_id, mode: 's3' }
+  }
+
+  // fallback: regular multipart upload
+  const job = await processVideo(file, opts.useVision ?? false)
+  return { job_id: job.job_id, mode: 'fallback' }
+}

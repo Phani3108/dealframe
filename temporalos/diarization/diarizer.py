@@ -172,18 +172,59 @@ class PyAnnoteDiarizer:
         segs.append(DiarizationSegment(cur_speaker, cur_start, cur_end))
         return segs
 
+    def diarize(self, words: List[Word]) -> List[Word]:
+        """Uniform ``Diarizer`` interface — falls back to heuristic when no audio is available.
+
+        ``PyAnnoteDiarizer`` needs an audio path to run real diarization via
+        :meth:`apply_to_words`. When callers only pass ``words`` (no audio), we
+        transparently reuse the heuristic so the factory's return type stays a
+        consistent duck-typed ``diarize(words) -> List[Word]`` contract.
+        """
+        return MockDiarizer().diarize(words)
+
 
 def get_diarizer(
     pause_threshold_ms: int = 1500,
-    use_pyannote: bool = False,
+    use_pyannote: Optional[bool] = None,
     hf_token: Optional[str] = None,
     num_speakers: Optional[int] = None,
 ) -> MockDiarizer | PyAnnoteDiarizer:
-    """Factory — uses PyAnnoteDiarizer if pyannote is available and requested."""
-    if use_pyannote:
+    """Factory — prefers PyAnnoteDiarizer when available, falls back to heuristic.
+
+    ``use_pyannote`` tri-state:
+      * ``True``  — require pyannote; fall back if unavailable and log a warning.
+      * ``False`` — always use the heuristic diarizer.
+      * ``None``  — auto-detect. Enabled when ``DEALFRAME_DIARIZER != "mock"``
+        and either pyannote is importable or a HUGGINGFACE_TOKEN is present.
+    """
+    import os
+
+    if use_pyannote is False:
+        return MockDiarizer(pause_threshold_ms=pause_threshold_ms)
+
+    env_pref = (os.environ.get("DEALFRAME_DIARIZER") or "").lower()
+    if env_pref == "mock":
+        return MockDiarizer(pause_threshold_ms=pause_threshold_ms)
+
+    resolved_token = hf_token or os.environ.get("HUGGINGFACE_TOKEN") or os.environ.get("HF_TOKEN")
+
+    if use_pyannote or env_pref == "pyannote":
+        want_pyannote = True
+    else:  # auto
+        want_pyannote = True  # opt-in by default when importable
+
+    if want_pyannote:
         try:
             from pyannote.audio import Pipeline  # noqa: F401
-            return PyAnnoteDiarizer(hf_token=hf_token, num_speakers=num_speakers)
+            return PyAnnoteDiarizer(hf_token=resolved_token, num_speakers=num_speakers)
         except ImportError:
-            logger.warning("pyannote-audio not installed, falling back to heuristic diarizer")
+            if use_pyannote:
+                logger.warning(
+                    "pyannote-audio requested but not installed — falling back to heuristic diarizer",
+                )
+            else:
+                logger.debug("pyannote-audio not installed — using heuristic diarizer")
+        except Exception as exc:  # pragma: no cover — defensive
+            logger.warning("Could not initialise pyannote diarizer: %s", exc)
+
     return MockDiarizer(pause_threshold_ms=pause_threshold_ms)

@@ -1,12 +1,15 @@
-"""TemporalOS Python SDK — programmatic access to the Decision Intelligence API.
+"""DealFrame Python SDK — programmatic access to the Negotiation Intelligence API.
 
 Quick start:
-    from temporalos_sdk import TemporalOSClient
+    from temporalos_sdk import DealFrameClient
 
-    client = TemporalOSClient("http://localhost:8000")
+    client = DealFrameClient("http://localhost:8000")
     job = client.upload("meeting.mp4")
     result = client.wait_for_result(job.job_id)
     print(result.segments[0]["topic"])
+
+The legacy ``TemporalOSClient`` / ``TemporalOSError`` names remain exported
+as aliases for back-compat with existing integrations.
 """
 
 from __future__ import annotations
@@ -228,3 +231,20 @@ class TemporalOSClient:
     def system_stats(self) -> Dict[str, Any]:
         """Get system-wide statistics."""
         return self._get("/api/v1/admin/stats")
+
+
+# ── Rebranded aliases ────────────────────────────────────────────────────────
+# New code should prefer these DealFrame-branded names. Legacy names above
+# remain for wire-level back-compat with existing integrations / docs.
+
+DealFrameClient = TemporalOSClient
+DealFrameError = TemporalOSError
+
+__all__ = [
+    "TemporalOSClient",
+    "TemporalOSError",
+    "DealFrameClient",
+    "DealFrameError",
+    "JobResult",
+    "AnnotationResult",
+]

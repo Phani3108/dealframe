@@ -30,6 +30,8 @@ import {
   Menu,
   X,
   Home,
+  Inbox,
+  RefreshCw,
 } from 'lucide-react'
 import { getNotifications, markAllNotificationsRead } from '../api/client'
 
@@ -53,6 +55,7 @@ const navGroups: NavGroup[] = [
     label: 'Core',
     items: [
       { to: '/home', label: 'Home', icon: Home, tier: 'essentials' },
+      { to: '/deals', label: 'Deal Inbox', icon: Inbox, tier: 'essentials' },
       { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, tier: 'essentials' },
       { to: '/upload', label: 'Upload & Process', icon: Upload, tier: 'essentials' },
       { to: '/search', label: 'Search', icon: Search, tier: 'essentials' },
@@ -68,6 +71,7 @@ const navGroups: NavGroup[] = [
       { to: '/meeting-prep', label: 'Meeting Prep', icon: Calendar, tier: 'pro' },
       { to: '/batch', label: 'Batch', icon: Layers, tier: 'pro' },
       { to: '/patterns', label: 'Pattern Miner', icon: TrendingUp, tier: 'power' },
+      { to: '/compare', label: 'Deal Compare', icon: GitCompare, tier: 'pro' },
       { to: '/diff', label: 'Diff Engine', icon: GitCompare, tier: 'power' },
       { to: '/knowledge-graph', label: 'Knowledge Graph', icon: Network, tier: 'power' },
     ],
@@ -77,9 +81,11 @@ const navGroups: NavGroup[] = [
     items: [
       { to: '/observatory', label: 'Observatory', icon: Eye, tier: 'power' },
       { to: '/finetuning', label: 'Fine-tuning', icon: Zap, tier: 'power' },
+      { to: '/flywheel', label: 'Flywheel', icon: RefreshCw, tier: 'power' },
       { to: '/local', label: 'Local Pipeline', icon: Cpu, tier: 'power' },
       { to: '/streaming', label: 'Live Stream', icon: Radio, tier: 'power' },
       { to: '/schema-builder', label: 'Schema Builder', icon: Settings, tier: 'power' },
+      { to: '/verticals', label: 'Vertical Packs', icon: Layers, tier: 'pro' },
     ],
   },
   {
